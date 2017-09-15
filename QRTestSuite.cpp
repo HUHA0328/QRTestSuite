@@ -363,20 +363,57 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 }
 
 QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrpPrevImage) {
+	Point QRPos;
+	// process FiPs
+	fipImage = cv_getFiPOrder(fipImage);
+	// if 3 or 2 diagonal we already have the position
+	if (fipImage.size() == 3) {
+		if (fipImage[0].relPos == 0)
+			QRPos = (fipImage[1].pos + fipImage[2].pos)*.5;
+		else if (fipImage[1].relPos == 0)
+			QRPos = (fipImage[0].pos + fipImage[2].pos)*.5;
+		else if (fipImage[2].relPos == 0)
+			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
+	}
+	else if (fipImage.size() == 2) {
+		if (fipImage[0].relPos != 0 && fipImage[1].relPos != 0) {
+			float angle = cv_lineLineAngle(fipImage[0].shape[0], fipImage[0].shape[1], fipImage[0].pos, fipImage[1].pos);
+			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
+			cout << angle <<" pause" << endl;
+		}
+	}
+	// if 2 parallel possible position
+	// What could we do?
+	// check if there is a tag expected in one of the two possible position and then accept that
+	// if 1 check possible positions
+	// What could we do?
+	// check if there is a tag expected in the radius?
+	// ignore might work best? (only if this happens rarely which seems to be the case)
+	// check if there is tag for the Pos
+
+
+
+	// if yes load data from app
+
+	// if no reconstruct planar QR code and load data
+
+	// check if tag exists else give new one
+	
+
+
+	// DEBUG CENTER POINT
+	if (debug == true) {
+		circle(image, QRPos, 2, Scalar(0, 0, 255), -1, 8, 0);
+	}
+	//***** old structure ***
 	//if there is a tag already
-
 	//if there are full FiP and no tag <-- 1. priority
-	cv_getFiPOrder(fipImage);
-
-
+	//cv_getFiPOrder(fipImage);
 	//drawContours(image, vector<vector<Point> >(1, fipImage.at(0).shape), -1, Scalar(0, 0, 255), 1, 8);
 	//imshow("QR", image);
 	//if there are 2 FiP and tag
-
 	//if there are 1 Fip and tag
-
 	//if there are 2 and no tag
-
 	//if there are 1 and no tag
 
 	QRCode test(0);
@@ -398,17 +435,8 @@ int cv_HarrisCorner(Mat img) {
 //###############################################################################
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order with 0 being A 1 being B 2 being C 
 										 //if less then 3 FiP unknown FiPs should get the tag -1 so we can reconstruct them
-	//vector<FiP> ordered;
-	//vector<Point> centers;
 	Point peak;
-	//tuple<Point, Point> hypotenuse();
 	Point hyotenuse1, hyotenuse2;
-
-	/*
-	for (auto &fip : unordered) {
-		centers.push_back(cv_getCentroid(fip.shape));
-	}
-	*/
 
 	// if three fips exist we can predict which is A B C easily by checking which Fips build the hypotenuse of the triangle
 	if (unordered.size() == 3) {
@@ -421,54 +449,40 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 		//This could be done better? Case statement maybe ?
 		if (side1 == maxVal) {
 			peak = unordered[2].pos;
-			//auto hypotenuse = (centers[1], centers[2]);
-			//hyotenuse1 = unordered[0].pos;
-			//hyotenuse2 = unordered[1].pos;
 			unordered[0].relPos = 1;
 			unordered[1].relPos = 2;
 			unordered[2].relPos = 0;
 		}
 		else if (side2 == maxVal) {
 			peak = unordered[1].pos;
-			//auto hypotenuse = (centers[1], centers[3]);
-			//hyotenuse1 = unordered[0].pos;
-			//hyotenuse2 = unordered[2].pos;
 			unordered[0].relPos = 1;
 			unordered[1].relPos = 0;
 			unordered[2].relPos = 2;
 		}
 		else if (side3 == maxVal) {
 			peak = unordered[0].pos;
-			//auto hypotenuse = (centers[2], centers[3]);
-			//hyotenuse1 = unordered[1].pos;
-			//hyotenuse2 = unordered[2].pos;
 			unordered[0].relPos = 0;
 			unordered[1].relPos = 1;
 			unordered[2].relPos = 2;
 		}
-
-		//Point hypotenusePoint = (hyotenuse1 + hyotenuse2)*.5;		
-		//circle(image, hypotenusePoint, 2, Scalar(255, 0, 0), -1, 8, 0);
-		//circle(image, Point(hypotenusePoint.x+100, hypotenusePoint.y+100), 2, Scalar(255, 0, 0), -1, 8, 0);
 	}
-
-	//	Should these two cases be handled here or by the reconstruction algorithm?
-
 	// if two fips exist we can check if they are on the Diagonal and thus B and C or not and thus A and ?
 	if (unordered.size() == 2) {
 		//get the conecting side
 		float side1 = cv_euclideanDist(unordered[0].pos, unordered[1].pos);
 		//check if diagonal or orthogonal
 		float angle = cv_lineLineAngle(unordered[0].shape[0], unordered[0].shape[1], unordered[0].pos, unordered[1].pos);
-		if (0.1 < angle < 0.9) {
+		if (0.05 < abs(angle) && abs(angle) < 0.95) {
 			//diagonal
 			//Point hypotenusePoint = (centers[0] + centers[1])*.5;
 			unordered[0].relPos = 1;
 			unordered[1].relPos = 2;
+			//cout << "diagonal" << endl;
 		}
 		else {
 			unordered[0].relPos = 0;
 			unordered[1].relPos = 1;
+			//cout << "parallel" << endl;
 			//orthagonal/parallel
 		}
 	}
