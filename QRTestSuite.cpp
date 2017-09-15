@@ -377,9 +377,8 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrpPrevImage) {
 	}
 	else if (fipImage.size() == 2) {
 		if (fipImage[0].relPos != 0 && fipImage[1].relPos != 0) {
-			float angle = cv_lineLineAngle(fipImage[0].shape[0], fipImage[0].shape[1], fipImage[0].pos, fipImage[1].pos);
 			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
-			cout << angle <<" pause" << endl;
+
 		}
 	}
 	// if 2 parallel possible position
@@ -472,7 +471,7 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 		float side1 = cv_euclideanDist(unordered[0].pos, unordered[1].pos);
 		//check if diagonal or orthogonal
 		float angle = cv_lineLineAngle(unordered[0].shape[0], unordered[0].shape[1], unordered[0].pos, unordered[1].pos);
-		if (0.05 < abs(angle) && abs(angle) < 0.95) {
+		if (0.1 < abs(angle) && abs(angle) < 0.9) {
 			//diagonal
 			//Point hypotenusePoint = (centers[0] + centers[1])*.5;
 			unordered[0].relPos = 1;
