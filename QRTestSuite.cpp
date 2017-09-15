@@ -63,7 +63,6 @@ class FiP {
 public:
 	FiP();
 	FiP (Point pPos, vector<Point> pShape);
-	void setRelPos(int pRelPos);
 	Point pos;
 	vector<Point> shape;
 	int relPos; //relative pos in the QR code: 0 the corner, 1 and 2 the diagonal Fips: unkown -1? or 0?
@@ -399,44 +398,53 @@ int cv_HarrisCorner(Mat img) {
 //###############################################################################
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order with 0 being A 1 being B 2 being C 
 										 //if less then 3 FiP unknown FiPs should get the tag -1 so we can reconstruct them
-	vector<FiP> ordered;
-	vector<Point> centers;
+	//vector<FiP> ordered;
+	//vector<Point> centers;
 	Point peak;
 	//tuple<Point, Point> hypotenuse();
 	Point hyotenuse1, hyotenuse2;
 
-	
+	/*
 	for (auto &fip : unordered) {
 		centers.push_back(cv_getCentroid(fip.shape));
 	}
-	
+	*/
 
 	// if three fips exist we can predict which is A B C easily by checking which Fips build the hypotenuse of the triangle
-	if (centers.size() == 3) {
-		float side1 = cv_euclideanDist(centers[0], centers[1]);
-		float side2 = cv_euclideanDist(centers[0], centers[2]);
-		float side3 = cv_euclideanDist(centers[1], centers[2]);
+	if (unordered.size() == 3) {
+		float side1 = cv_euclideanDist(unordered[0].pos, unordered[1].pos);
+		float side2 = cv_euclideanDist(unordered[0].pos, unordered[2].pos);
+		float side3 = cv_euclideanDist(unordered[1].pos, unordered[2].pos);
 
 		float maxVal = max({ side1, side2, side3 });
 
 		//This could be done better? Case statement maybe ?
 		if (side1 == maxVal) {
-			peak = centers[2];
+			peak = unordered[2].pos;
 			//auto hypotenuse = (centers[1], centers[2]);
-			hyotenuse1 = centers[0];
-			hyotenuse2 = centers[1];
+			//hyotenuse1 = unordered[0].pos;
+			//hyotenuse2 = unordered[1].pos;
+			unordered[0].relPos = 1;
+			unordered[1].relPos = 2;
+			unordered[2].relPos = 0;
 		}
 		else if (side2 == maxVal) {
-			peak = centers[1];
+			peak = unordered[1].pos;
 			//auto hypotenuse = (centers[1], centers[3]);
-			hyotenuse1 = centers[0];
-			hyotenuse2 = centers[2];
+			//hyotenuse1 = unordered[0].pos;
+			//hyotenuse2 = unordered[2].pos;
+			unordered[0].relPos = 1;
+			unordered[1].relPos = 0;
+			unordered[2].relPos = 2;
 		}
 		else if (side3 == maxVal) {
-			peak = centers[0];
+			peak = unordered[0].pos;
 			//auto hypotenuse = (centers[2], centers[3]);
-			hyotenuse1 = centers[1];
-			hyotenuse2 = centers[2];
+			//hyotenuse1 = unordered[1].pos;
+			//hyotenuse2 = unordered[2].pos;
+			unordered[0].relPos = 0;
+			unordered[1].relPos = 1;
+			unordered[2].relPos = 2;
 		}
 
 		//Point hypotenusePoint = (hyotenuse1 + hyotenuse2)*.5;		
@@ -447,23 +455,30 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 	//	Should these two cases be handled here or by the reconstruction algorithm?
 
 	// if two fips exist we can check if they are on the Diagonal and thus B and C or not and thus A and ?
-	if (centers.size() == 2) {
+	if (unordered.size() == 2) {
 		//get the conecting side
-		float side1 = cv_euclideanDist(centers[0], centers[1]);
+		float side1 = cv_euclideanDist(unordered[0].pos, unordered[1].pos);
 		//check if diagonal or orthogonal
-		float angle = cv_lineLineAngle(unordered[0].shape[0], unordered[0].shape[1], centers[0], centers[1]);
+		float angle = cv_lineLineAngle(unordered[0].shape[0], unordered[0].shape[1], unordered[0].pos, unordered[1].pos);
 		if (0.1 < angle < 0.9) {
 			//diagonal
 			//Point hypotenusePoint = (centers[0] + centers[1])*.5;
+			unordered[0].relPos = 1;
+			unordered[1].relPos = 2;
 		}
 		else {
+			unordered[0].relPos = 0;
+			unordered[1].relPos = 1;
 			//orthagonal/parallel
 		}
 	}
 
 	// if one fip exist we can't build any order
+	if (unordered.size() == 1) {
+		unordered[0].relPos = 0;
+	}
 
-	return ordered;
+	return unordered;
 }
 
 vector<FiP> cv_reconstructMissingFiP(vector<FiP> orderedFiP) {
