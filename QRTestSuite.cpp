@@ -47,6 +47,8 @@ int cv_HarrisCorner(Mat img);
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered);
 
 //#################		Support Methods
+int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD);
+Point cv_getOuterCorner(FiP fip, Point center);
 float cv_lineLineAngle(Point l1_1, Point l1_2, Point l2_1, Point l2_2);
 float cv_vectorSize(Point a);
 Point cv_getCentroid(vector<Point> contour);
@@ -63,6 +65,7 @@ int cv_outputHisto(Mat input);
 class FiP {
 public:
 	FiP();
+	FiP (int pRelPos);
 	FiP (Point pPos, vector<Point> pShape);
 	Point pos;
 	vector<Point> shape;
@@ -76,6 +79,10 @@ public:
 
 FiP::FiP() {
 	
+}
+
+FiP::FiP(int pRelPos) {
+	relPos = pRelPos;
 }
 
 FiP::FiP (Point pPos, vector<Point> pShape) {
@@ -364,22 +371,38 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	Point QRPos;
+	FiP fip_A, fip_B, fip_C;
 	bool found = false;
 	// process FiPs
 	fipImage = cv_getFiPOrder(fipImage);
 	// if 3 or 2 diagonal we already have the position
 	if (fipImage.size() == 3) {
-		if (fipImage[0].relPos == 0)
+		if (fipImage[0].relPos == 0) {
 			QRPos = (fipImage[1].pos + fipImage[2].pos)*.5;
-		else if (fipImage[1].relPos == 0)
+			fip_A = fipImage[0];
+			fip_B = fipImage[1];
+			fip_C = fipImage[2];
+		}
+		else if (fipImage[1].relPos == 0) {
 			QRPos = (fipImage[0].pos + fipImage[2].pos)*.5;
-		else if (fipImage[2].relPos == 0)
+			fip_A = fipImage[1];
+			fip_B = fipImage[0];
+			fip_C = fipImage[2];
+		}
+		else if (fipImage[2].relPos == 0) {
 			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
+			fip_A = fipImage[1];
+			fip_B = fipImage[2];
+			fip_C = fipImage[0];
+		}
 		found = true;
 	}
 	else if (fipImage.size() == 2) {
 		if (fipImage[0].relPos != 0 && fipImage[1].relPos != 0) {
 			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
+			fip_A = FiP(-1);
+			fip_B = fipImage[0];
+			fip_C = fipImage[1];
 			found = true;
 		}
 	}
@@ -410,13 +433,29 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	// case that some might disappear 
 	// Also in the case of multi code we could tag all untagged QRs simply so that all did a similar movement -> we say that a quick forward/backward
 	// movement is not as likely as a rotational movement
+
+	if (!found) { //This is for now since there is no reconstruction so only if I can actually do the calculations we continue
+		return qrPrevImage; 
+	}
+
 	if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
 		return qrPrevImage;
 	}
 	else {
 		//Identify
 		
-			
+		//get CornerPointA in Case it exists already
+		Point pA;
+		if (fip_A.relPos == -1)
+			pA = Point(0,0);
+		else 
+			pA = cv_getOuterCorner(fip_A, QRPos);
+		//get Corners A if it doesnt and D in any Case
+		Point pD;
+		int cornersOut = cv_findCorners(pA, fip_B, fip_C, pD);
+
+
+
 		//If tag exists retag
 		int tag = qrPrevImage.tag + 1; //<- usually find next free tag - global variable?
 		QRCode newCode(tag);
@@ -461,6 +500,33 @@ int cv_HarrisCorner(Mat img) {
 //###############################################################################
 //Detection Support Functions 
 //###############################################################################
+int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD) {
+	//gets the two Diagonal fips - bother other cornerPoints will be reconstructed from this
+	//if FiP_A is know the outermost Point should be given in
+	if (pA.x != 0 & pA.y != 0) {
+
+	}
+
+	return 0;
+}
+
+Point cv_getOuterCorner(FiP fip, Point center) {
+	//gets the Point of the fip that makes up the Corner of the QR
+	//should be Point furthest away from center
+	Point outer(0, 0);
+	float maxDist = 0.0;
+	float dist;
+	for (auto &p : fip.shape) {
+		dist = cv_euclideanDist(p, center);
+		if (dist >= maxDist) {
+			maxDist = dist;
+			outer = p;
+		}
+	}
+	return outer;
+}
+
+
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order with 0 being A 1 being B 2 being C 
 										 //if less then 3 FiP unknown FiPs should get the tag -1 so we can reconstruct them
 	Point peak;
