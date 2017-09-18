@@ -29,6 +29,7 @@ float t;
 vector<float> allFPS;
 float avgFPS = 0.0, highFPS = 0.0, lowFPS = 999.0, globalFPS = 0.0; //FPS Performance Calculation happening global so minimal impact on algorithm
 vector<int> fips; //just saves the number of FiPs detected for Benchmark
+Point prevPos;
 
 //#################		Classes
 class FiP;
@@ -82,9 +83,6 @@ FiP::FiP (Point pPos, vector<Point> pShape) {
 	shape = pShape;
 }
 
-
-
-
 class QRCode { //Class for the QR-Code that saves all relevant information for one Instance
 	public:
 		QRCode(int ptag);
@@ -93,6 +91,8 @@ class QRCode { //Class for the QR-Code that saves all relevant information for o
 		FiP fip_a, fip_b, fip_c; //The finderpatterns
 		Point a, b, c, d; //the Corner Points
 		String orientation; //does it make sense to create a new class for this?
+		//int screenSize; //Size in ScreenSpace
+		//float realSize; //Size in Centimeters - probably 20cm 
 
 };
 
@@ -362,8 +362,9 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	return fipList;
 }
 
-QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrpPrevImage) {
+QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	Point QRPos;
+	bool found = false;
 	// process FiPs
 	fipImage = cv_getFiPOrder(fipImage);
 	// if 3 or 2 diagonal we already have the position
@@ -374,11 +375,12 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrpPrevImage) {
 			QRPos = (fipImage[0].pos + fipImage[2].pos)*.5;
 		else if (fipImage[2].relPos == 0)
 			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
+		found = true;
 	}
 	else if (fipImage.size() == 2) {
 		if (fipImage[0].relPos != 0 && fipImage[1].relPos != 0) {
 			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
-
+			found = true;
 		}
 	}
 	// if 2 parallel possible position
@@ -397,23 +399,50 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrpPrevImage) {
 	// if no reconstruct planar QR code and load data
 
 	// check if tag exists else give new one
+	// we want a distance to a tag from a previous image to check if this is the same tag
+	//	this could create problems when there are overlaying tags
+	// It would be clever to have this distance to change depending on the movement speed/ turning speed
+	// With a normal movement the distance between the centers rarely goes over 50 pixels but with rapid movements it tends to get far higher
+	// can we approximate the speed just by the picture in a really fast way? Or should we just describe that here a injection of attributes send by
+	// the phone would be extremly helpfull
+	// Because actually the detection of same Tag will be MOST Important when fast movements take place -> distortion of the picture
+	// we could see how other detected FiPs or QRs behave but we still would have to have method to make sure which FiP moved where espacially in the
+	// case that some might disappear 
+	// Also in the case of multi code we could tag all untagged QRs simply so that all did a similar movement -> we say that a quick forward/backward
+	// movement is not as likely as a rotational movement
+	if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
+		return qrPrevImage;
+	}
+	else {
+		//Identify
+		
+			
+		//If tag exists retag
+		int tag = qrPrevImage.tag + 1; //<- usually find next free tag - global variable?
+		QRCode newCode(tag);
+
+		//here have a list that gets a new entry with the tag indentification pair
+
+		return newCode;
+	}
+
 	
 
 
 	// DEBUG CENTER POINT
 	if (debug == true) {
 		circle(image, QRPos, 2, Scalar(0, 0, 255), -1, 8, 0);
+		if (found) {
+			try {
+				float dist = cv_vectorSize(prevPos - QRPos);
+				if (dist>=150.0)
+					cout << dist << endl;
+			}
+			catch (const std::exception&) {}
+
+			prevPos = QRPos;
+		}
 	}
-	//***** old structure ***
-	//if there is a tag already
-	//if there are full FiP and no tag <-- 1. priority
-	//cv_getFiPOrder(fipImage);
-	//drawContours(image, vector<vector<Point> >(1, fipImage.at(0).shape), -1, Scalar(0, 0, 255), 1, 8);
-	//imshow("QR", image);
-	//if there are 2 FiP and tag
-	//if there are 1 Fip and tag
-	//if there are 2 and no tag
-	//if there are 1 and no tag
 
 	QRCode test(0);
 	return test;
@@ -516,6 +545,13 @@ vector<Point> cv_getCornerPoints(vector<FiP> orderedReconstructedFiP) {
 //###############################################################################
 //General Support Functions 
 //###############################################################################
+bool cv_inRegion(Point center, int radius, Point newPoint) { //gives out true if in the region around the center is the newPoint
+	if (cv_vectorSize(center- newPoint) <= radius) 
+		return true;
+	else
+		return false;
+}
+
 float cv_lineLineAngle(Point l1_1, Point l1_2, Point l2_1, Point l2_2) { //Gets the angle that is between two lines denoted by their start and end Points
 	//return ((l1_2.x - l1_1.x)*(l2_2.x - l2_1.x)) / (abs(l1_2.x - l1_1.x)*abs(l2_2.x - l2_1.x)); //<-- please test http://mathworld.wolfram.com/Line-LineAngle.html
 	return ((l1_2 - l1_1).dot(l2_2 - l2_1)) / (cv_vectorSize(l1_2 - l1_1)*cv_vectorSize(l2_2 - l2_1));
