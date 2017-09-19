@@ -19,8 +19,8 @@ using namespace cv;
 //#################		Tags
 const bool benchmark = true;
 const String benchmarktype = "stream"; //stream mp4, jpg, png <--- prob useless since no gain
-const bool debug = true;
-const bool showCalc = true;
+const bool debug = false;
+const bool showCalc = false;
 
 //#################		Global Variables
 Mat image; //back to multiFIPdetector
@@ -50,6 +50,7 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered);
 int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos);
 Point cv_getOuterCorner(FiP fip, Point center);
 Point cv_getOuterCorner(FiP fip, Point center, int& index);
+bool cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& r);
 float cv_lineLineAngle(Point l1_1, Point l1_2, Point l2_1, Point l2_2);
 float cv_vectorSize(Point a);
 Point cv_getCentroid(vector<Point> contour);
@@ -436,10 +437,12 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	// movement is not as likely as a rotational movement
 
 	if (!found) { //This is for now since there is no reconstruction so only if I can actually do the calculations we continue
+		//cout << "not Found" << endl;
 		return qrPrevImage; 
 	}
-
-	if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
+	//if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
+	if ((cv_euclideanDist(qrPrevImage.pos, QRPos)) <= 150.0) {
+		//cout << "direct" << endl;
 		return qrPrevImage;
 	}
 	else {
@@ -454,12 +457,45 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		//get Corners A if it doesnt and D in any Case
 		Point pD;
 		int cornersOut = cv_findCorners(pA, fip_B, fip_C, pD, QRPos);
+		//cout << "Calculated Corners" << endl;
+		//Now with the corners Reconstruct the planar image of the QRCode
+		vector<Point> qrImg, dst;
+		qrImg.push_back(pA);
+		qrImg.push_back(cv_getOuterCorner(fip_B,  QRPos));
+		qrImg.push_back(cv_getOuterCorner(fip_C,  QRPos)); //<- order important?
+		qrImg.push_back(pD);
+
+		//replace with non magic Numbers?
+		dst.push_back(Point(0, 0));
+		dst.push_back(Point(100, 0));
+		dst.push_back(Point(100, 100));
+		dst.push_back(Point(0, 1000));
+
+		Mat warp_matrix;
+
+		//For Testing Do different later!
+		Mat qr, qr_raw, qr_gray, qr_thres;
+		qr_raw = Mat::zeros(100, 100, CV_8UC3);
+		qr = Mat::zeros(100, 100, CV_8UC3);
+		qr_gray = Mat::zeros(100, 100, CV_8UC1);
+		qr_thres = Mat::zeros(100, 100, CV_8UC1);
+
+		warp_matrix = getPerspectiveTransform(qrImg, dst);
+		warpPerspective(image, qr_raw, warp_matrix, Size(100, 100));
+		copyMakeBorder(qr_raw, qr, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255));
+
+		cvtColor(qr, qr_gray, CV_RGB2GRAY);
+		threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
+		imshow("QR code", qr_thres);
+
+
 
 
 
 		//If tag exists retag
 		int tag = qrPrevImage.tag + 1; //<- usually find next free tag - global variable?
 		QRCode newCode(tag);
+		newCode.pos = QRPos;
 
 		//here have a list that gets a new entry with the tag indentification pair
 
@@ -539,7 +575,8 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 		else
 			linePointC = fip_C.shape[indexOfPointC + increment];
 
-
+		cv_getIntersection(cornerB, linePointB, cornerC, linePointC, pD);
+		cout << pD << endl;
 	}
 	else {
 
@@ -667,6 +704,21 @@ vector<Point> cv_getCornerPoints(vector<FiP> orderedReconstructedFiP) {
 //###############################################################################
 //General Support Functions 
 //###############################################################################
+bool cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& r) {
+	//Gets the intersectionPoint from 2 lines denoted by a1 a2 and b1 b2
+	Point x = a2 - a1;
+	Point d1 = b1 - a1;
+	Point d2 = b2 - a2;
+
+	float cross = d1.x*d2.y - d1.y*d2.x;
+	if (abs(cross) < /*EPS*/1e-8)
+		return false;
+
+	double t1 = (x.x * d2.y - x.y * d2.x) / cross;
+	r = a1 + d1 * t1;
+	return true;
+}
+
 bool cv_inRegion(Point center, int radius, Point newPoint) { //gives out true if in the region around the center is the newPoint
 	if (cv_vectorSize(center- newPoint) <= radius) 
 		return true;
