@@ -47,8 +47,9 @@ int cv_HarrisCorner(Mat img);
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered);
 
 //#################		Support Methods
-int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD);
+int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos);
 Point cv_getOuterCorner(FiP fip, Point center);
+Point cv_getOuterCorner(FiP fip, Point center, int& index);
 float cv_lineLineAngle(Point l1_1, Point l1_2, Point l2_1, Point l2_2);
 float cv_vectorSize(Point a);
 Point cv_getCentroid(vector<Point> contour);
@@ -452,7 +453,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			pA = cv_getOuterCorner(fip_A, QRPos);
 		//get Corners A if it doesnt and D in any Case
 		Point pD;
-		int cornersOut = cv_findCorners(pA, fip_B, fip_C, pD);
+		int cornersOut = cv_findCorners(pA, fip_B, fip_C, pD, QRPos);
 
 
 
@@ -500,10 +501,47 @@ int cv_HarrisCorner(Mat img) {
 //###############################################################################
 //Detection Support Functions 
 //###############################################################################
-int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD) {
+int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 	//gets the two Diagonal fips - bother other cornerPoints will be reconstructed from this
 	//if FiP_A is know the outermost Point should be given in
-	if (pA.x != 0 & pA.y != 0) {
+	if (pA.x != 0 && pA.y != 0) { //This is stupid TODO check how properly check for null objects
+		int decrement = -1;
+		int increment = 1;
+		int indexOfPointB;
+		Point cornerB = cv_getOuterCorner(fip_B, QRPos, indexOfPointB);
+		Point linePointB;
+		if (indexOfPointB == 0) {
+			decrement = 4;
+		}
+		else if (indexOfPointB == 4) {
+			increment = -1;
+		}
+		//the Point further away from the corner A will be the point with which a line for the Corner D can be built
+		if (cv_euclideanDist(pA, fip_B.shape[indexOfPointB + decrement]) > cv_euclideanDist(pA, fip_B.shape[indexOfPointB + increment]))
+			linePointB = fip_B.shape[indexOfPointB + decrement];
+		else
+			linePointB = fip_B.shape[indexOfPointB + increment];
+
+		int indexOfPointC;
+		Point cornerC = cv_getOuterCorner(fip_C, QRPos, indexOfPointC);
+		Point linePointC;
+		decrement = -1;
+		increment = 1;
+		if (indexOfPointC == 0) {
+			decrement = 4;
+		}
+		else if (indexOfPointC == 4) {
+			increment = -1;
+		}
+		//the Point further away from the corner A will be the point with which a line for the Corner D can be built
+		if (cv_euclideanDist(pA, fip_C.shape[indexOfPointC + decrement]) > cv_euclideanDist(pA, fip_C.shape[indexOfPointC + increment]))
+			linePointC = fip_C.shape[indexOfPointC + decrement];
+		else
+			linePointC = fip_C.shape[indexOfPointC + increment];
+
+
+	}
+	else {
 
 	}
 
@@ -521,6 +559,24 @@ Point cv_getOuterCorner(FiP fip, Point center) {
 		if (dist >= maxDist) {
 			maxDist = dist;
 			outer = p;
+		}
+	}
+	return outer;
+}
+
+Point cv_getOuterCorner(FiP fip, Point center, int& index) {
+	//gets the Point of the fip that makes up the Corner of the QR
+	//should be Point furthest away from center
+	//this also returns the index of the Point in the FiP shape
+	Point outer(0, 0);
+	float maxDist = 0.0;
+	float dist;
+	for (int i = 0; i < 4; i++) {
+		dist = cv_euclideanDist(fip.shape[i], center);
+		if (dist >= maxDist) {
+			maxDist = dist;
+			outer = fip.shape[i];
+			index = i;
 		}
 	}
 	return outer;
