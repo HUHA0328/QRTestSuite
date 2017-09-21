@@ -19,8 +19,8 @@ using namespace cv;
 //#################		Tags
 const bool benchmark = true;
 const String benchmarktype = "stream"; //stream mp4, jpg, png <--- prob useless since no gain
-const bool debug = false;
-const bool showCalc = false;
+const bool debug = true;
+const bool showCalc = true;
 
 //#################		Global Variables
 Mat image; //back to multiFIPdetector
@@ -460,6 +460,9 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		int cornersOut = cv_findCorners(pA, fip_B, fip_C, pD, QRPos);
 		//cout << "Calculated Corners" << endl;
 		//Now with the corners Reconstruct the planar image of the QRCode
+
+		//TODO This only works with Point2f which isnt Paintable also our QR Image is quite Poor maybe we should get it from the original image 
+		//and not from the changed one to find the FIP -- but here we should see first what zBar or another library can make out of it 
 		vector<Point2f> qrImg, dst;
 		qrImg.push_back(Point2f(pA));
 		qrImg.push_back(Point2f(cv_getOuterCorner(fip_B,  QRPos)));
@@ -482,8 +485,8 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		Mat warp_matrix;
 
 		//cout << "draw" << endl;
-		cout << qrImg.size() << endl;
-		cout << dst.size() << endl;
+		//cout << qrImg.size() << endl;
+		//cout << dst.size() << endl;
 		//drawContours(image, vector<vector<Point2f> >(1.0, qrImg), -1, Scalar(0, 0, 255), 1, 8);
 		//imshow("contour", image);
 		//waitKey(0);
@@ -491,11 +494,13 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		{
 			warp_matrix = getPerspectiveTransform(qrImg, dst);
 			warpPerspective(image, qr_raw, warp_matrix, Size(200, 200));
-			copyMakeBorder(qr_raw, qr, 20, 20, 20, 20, BORDER_CONSTANT, Scalar(255, 255, 255));
+			copyMakeBorder(qr_raw, qr, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255));
 
 			cvtColor(qr, qr_gray, CV_RGB2GRAY);
 			threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
-			//imshow("QR code", qr_thres);
+			imshow("QR code", qr_gray);
+			waitKey(1);
+			waitKey(1);
 		}
 
 
@@ -585,15 +590,15 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 			linePointC = fip_C.shape[indexOfPointC + increment];
 
 		cv_getIntersection(cornerB, linePointB, cornerC, linePointC, pD);
-		cout << pD << endl;
-		vector<Point> lnB;
-		vector<Point> lnC;
-		lnB.push_back(cornerB);
-		lnB.push_back(linePointB);
-		lnC.push_back(cornerC);
-		lnC.push_back(linePointC);
-		drawContours(image, vector<vector<Point> >(1, lnB), -1, Scalar(255, 0, 0), 3, 8);
-		drawContours(image, vector<vector<Point> >(1, lnC), -1, Scalar(255, 255, 0), 3, 8);
+		//cout << pD << endl;
+		//vector<Point> lnB;
+		//vector<Point> lnC;
+		//lnB.push_back(cornerB);
+		//lnB.push_back(linePointB);
+		//lnC.push_back(cornerC);
+		//lnC.push_back(linePointC);
+		//drawContours(image, vector<vector<Point> >(1, lnB), -1, Scalar(255, 0, 0), 3, 8);
+		//drawContours(image, vector<vector<Point> >(1, lnC), -1, Scalar(255, 255, 0), 3, 8);
 
 	}
 	else {
