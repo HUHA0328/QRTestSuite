@@ -59,6 +59,7 @@ bool cv_inRect(vector<Point> rectangle, Point p);
 bool cv_inFiPRegTesting(vector<vector<Point>> &FiPRegs, vector<Point> Contour, vector<bool> &updated);
 int cv_CandidateInRegion(vector<Point> contour, vector<vector<Point> > candidates);
 int cv_outputHisto(Mat input);
+float cross(Point2f v1, Point2f v2);
 
 
 //###############################################################################
@@ -459,35 +460,43 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		int cornersOut = cv_findCorners(pA, fip_B, fip_C, pD, QRPos);
 		//cout << "Calculated Corners" << endl;
 		//Now with the corners Reconstruct the planar image of the QRCode
-		vector<Point> qrImg, dst;
-		qrImg.push_back(pA);
-		qrImg.push_back(cv_getOuterCorner(fip_B,  QRPos));
-		qrImg.push_back(cv_getOuterCorner(fip_C,  QRPos)); //<- order important?
-		qrImg.push_back(pD);
-
-		//replace with non magic Numbers?
-		dst.push_back(Point(0, 0));
-		dst.push_back(Point(100, 0));
-		dst.push_back(Point(100, 100));
-		dst.push_back(Point(0, 1000));
-
-		Mat warp_matrix;
+		vector<Point2f> qrImg, dst;
+		qrImg.push_back(Point2f(pA));
+		qrImg.push_back(Point2f(cv_getOuterCorner(fip_B,  QRPos)));
+		qrImg.push_back(Point2f(pD)); //<- order important?
+		qrImg.push_back(Point2f(cv_getOuterCorner(fip_C, QRPos)));
 
 		//For Testing Do different later!
 		Mat qr, qr_raw, qr_gray, qr_thres;
-		qr_raw = Mat::zeros(100, 100, CV_8UC3);
-		qr = Mat::zeros(100, 100, CV_8UC3);
-		qr_gray = Mat::zeros(100, 100, CV_8UC1);
-		qr_thres = Mat::zeros(100, 100, CV_8UC1);
+		qr_raw = Mat::zeros(200, 200, CV_8UC3);
+		qr = Mat::zeros(200, 200, CV_8UC3);
+		qr_gray = Mat::zeros(200, 200, CV_8UC1);
+		qr_thres = Mat::zeros(200, 200, CV_8UC1);
 
-		warp_matrix = getPerspectiveTransform(qrImg, dst);
-		warpPerspective(image, qr_raw, warp_matrix, Size(100, 100));
-		copyMakeBorder(qr_raw, qr, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255));
+		//replace with non magic Numbers?
+		dst.push_back(Point2f(0, 0));
+		dst.push_back(Point2f(qr.cols, 0));
+		dst.push_back(Point2f(qr.cols, qr.rows));
+		dst.push_back(Point2f(0, qr.rows));
 
-		cvtColor(qr, qr_gray, CV_RGB2GRAY);
-		threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
-		imshow("QR code", qr_thres);
+		Mat warp_matrix;
 
+		//cout << "draw" << endl;
+		cout << qrImg.size() << endl;
+		cout << dst.size() << endl;
+		//drawContours(image, vector<vector<Point2f> >(1.0, qrImg), -1, Scalar(0, 0, 255), 1, 8);
+		//imshow("contour", image);
+		//waitKey(0);
+		if (qrImg.size() == 4 && dst.size() == 4)			// Failsafe for WarpMatrix Calculation to have only 4 Points with src and dst
+		{
+			warp_matrix = getPerspectiveTransform(qrImg, dst);
+			warpPerspective(image, qr_raw, warp_matrix, Size(200, 200));
+			copyMakeBorder(qr_raw, qr, 20, 20, 20, 20, BORDER_CONSTANT, Scalar(255, 255, 255));
+
+			cvtColor(qr, qr_gray, CV_RGB2GRAY);
+			threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
+			//imshow("QR code", qr_thres);
+		}
 
 
 
@@ -547,9 +556,9 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 		Point cornerB = cv_getOuterCorner(fip_B, QRPos, indexOfPointB);
 		Point linePointB;
 		if (indexOfPointB == 0) {
-			decrement = 4;
+			decrement = 3;
 		}
-		else if (indexOfPointB == 4) {
+		else if (indexOfPointB == 3) {
 			increment = -1;
 		}
 		//the Point further away from the corner A will be the point with which a line for the Corner D can be built
@@ -564,9 +573,9 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 		decrement = -1;
 		increment = 1;
 		if (indexOfPointC == 0) {
-			decrement = 4;
+			decrement = 3;
 		}
-		else if (indexOfPointC == 4) {
+		else if (indexOfPointC == 3) {
 			increment = -1;
 		}
 		//the Point further away from the corner A will be the point with which a line for the Corner D can be built
@@ -577,6 +586,15 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 
 		cv_getIntersection(cornerB, linePointB, cornerC, linePointC, pD);
 		cout << pD << endl;
+		vector<Point> lnB;
+		vector<Point> lnC;
+		lnB.push_back(cornerB);
+		lnB.push_back(linePointB);
+		lnC.push_back(cornerC);
+		lnC.push_back(linePointC);
+		drawContours(image, vector<vector<Point> >(1, lnB), -1, Scalar(255, 0, 0), 3, 8);
+		drawContours(image, vector<vector<Point> >(1, lnC), -1, Scalar(255, 255, 0), 3, 8);
+
 	}
 	else {
 
@@ -704,19 +722,37 @@ vector<Point> cv_getCornerPoints(vector<FiP> orderedReconstructedFiP) {
 //###############################################################################
 //General Support Functions 
 //###############################################################################
-bool cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& r) {
+bool cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& res) {
 	//Gets the intersectionPoint from 2 lines denoted by a1 a2 and b1 b2
-	Point x = a2 - a1;
+	/*Point x = a2 - a1;
 	Point d1 = b1 - a1;
 	Point d2 = b2 - a2;
 
-	float cross = d1.x*d2.y - d1.y*d2.x;
-	if (abs(cross) < /*EPS*/1e-8)
+	float cross = (d1.x*d2.y) - (d1.y*d2.x);
+	if (abs(cross) < /*EPS*//*1e-8) {
+		cout << "FALSE" << endl;
 		return false;
+	}
+		
+	double t1 = ((x.x * d2.y) - (x.y * d2.x)) / cross;
+	r = a1 + (d1 * t1);
+	return true;*/
+	Point p = a1;
+	Point q = b1;
+	Point r(a2 - a1);
+	Point s(b2 - b1);
 
-	double t1 = (x.x * d2.y - x.y * d2.x) / cross;
-	r = a1 + d1 * t1;
+	if (cross(r, s) == 0) { return false; }
+
+	float t = cross(q - p, s) / cross(r, s);
+
+	res = p + t*r;
 	return true;
+}
+
+float cross(Point2f v1, Point2f v2)
+{
+	return v1.x*v2.y - v1.y*v2.x;
 }
 
 bool cv_inRegion(Point center, int radius, Point newPoint) { //gives out true if in the region around the center is the newPoint
