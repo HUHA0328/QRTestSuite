@@ -9,8 +9,10 @@
 #include <time.h>
 #include <cmath>
 #include <chrono>
+#include <zbar.h>
 using namespace std;
 using namespace cv;
+using namespace zbar;
 
 //###############################################################################
 // Initialization
@@ -60,7 +62,8 @@ bool cv_inFiPRegTesting(vector<vector<Point>> &FiPRegs, vector<Point> Contour, v
 int cv_CandidateInRegion(vector<Point> contour, vector<vector<Point> > candidates);
 int cv_outputHisto(Mat input);
 float cross(Point2f v1, Point2f v2);
-
+//Decode Function
+int decode(Mat inputImg);
 
 //###############################################################################
 //Methods
@@ -470,10 +473,11 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		qrImg.push_back(Point2f(cv_getOuterCorner(fip_C, QRPos)));
 
 		//For Testing Do different later!
-		Mat qr, qr_raw, qr_gray, qr_thres;
+		Mat qr, qr_raw, qr_gray, qr_gray_sharp, qr_thres;
 		qr_raw = Mat::zeros(200, 200, CV_8UC3);
 		qr = Mat::zeros(200, 200, CV_8UC3);
 		qr_gray = Mat::zeros(200, 200, CV_8UC1);
+		qr_gray_sharp = Mat::zeros(200, 200, CV_8UC1);
 		qr_thres = Mat::zeros(200, 200, CV_8UC1);
 
 		//replace with non magic Numbers?
@@ -497,10 +501,15 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			copyMakeBorder(qr_raw, qr, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255));
 
 			cvtColor(qr, qr_gray, CV_RGB2GRAY);
+			//sharpen Image attempt Gaussian Blurr failed
+			//GaussianBlur(qr_gray, qr_gray_sharp, Size(3,3), 1);
+			//addWeighted(qr_gray, 1.5, qr_gray_sharp, -0.5, 0, qr_gray_sharp);
+			//threshold(qr_gray_sharp, qr_thres, 130, 255, CV_THRESH_BINARY);
+			//imshow("QR code", qr_thres);
+			//check image quality before processing?
 			threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
-			imshow("QR code", qr_gray);
-			waitKey(1);
-			waitKey(1);
+			imshow("QR code old", qr_thres);
+			waitKey(0);
 		}
 
 
@@ -547,6 +556,52 @@ int cv_HarrisCorner(Mat img) {
 
 	return 0;
 }
+//###############################################################################
+//Decodation Support Function
+//###############################################################################
+int decode(Mat inputImg) {
+	ImageScanner scanner;
+	scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
+	// obtain image data  
+	//char file[256];
+	//cin >> file;
+	//Mat img = imread(file, 0);
+	Mat imgout;
+	//cvtColor(img, imgout, CV_GRAY2RGB);
+	int width = inputImg.cols;
+	int height = inputImg.rows;
+	uchar *raw = (uchar *)inputImg.data;
+	// wrap image data  
+	Image imageFile(width, height, "Y800", raw, width * height);
+	// scan the image for barcodes  
+	int n = scanner.scan(imageFile);
+	// extract results  
+	for (Image::SymbolIterator symbol = imageFile.symbol_begin();
+	symbol != imageFile.symbol_end();
+		++symbol) {
+		vector<Point> vp;
+		// do something useful with results  
+		cout << "decoded " << symbol->get_type_name()
+			<< " symbol \"" << symbol->get_data() << '"' << " " << endl;
+		int n = symbol->get_location_size();
+		for (int i = 0; i<n; i++) {
+			vp.push_back(Point(symbol->get_location_x(i), symbol->get_location_y(i)));
+		}
+		RotatedRect r = minAreaRect(vp);
+		Point2f pts[4];
+		r.points(pts);
+		for (int i = 0; i<4; i++) {
+			line(imgout, pts[i], pts[(i + 1) % 4], Scalar(255, 0, 0), 3);
+		}
+		cout << "Angle: " << r.angle << endl;
+	}
+	imshow("imgout.jpg", imgout);
+
+	waitKey(0);
+}
+
+
+
 
 //###############################################################################
 //Detection Support Functions 
@@ -554,40 +609,40 @@ int cv_HarrisCorner(Mat img) {
 int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 	//gets the two Diagonal fips - bother other cornerPoints will be reconstructed from this
 	//if FiP_A is know the outermost Point should be given in
+	int decrementB = -1;
+	int incrementB = 1;
+	int decrementC = -1;
+	int incrementC = 1;
+	int indexOfPointB;
+	Point cornerB = cv_getOuterCorner(fip_B, QRPos, indexOfPointB);
+	int indexOfPointC;
+	Point cornerC = cv_getOuterCorner(fip_C, QRPos, indexOfPointC);
+	if (indexOfPointB == 0) {
+		decrementB = 3;
+	}
+	else if (indexOfPointB == 3) {
+		incrementB = -1;
+	}
+	if (indexOfPointC == 0) {
+		decrementC = 3;
+	}
+	else if (indexOfPointC == 3) {
+		incrementC = -1;
+	}
 	if (pA.x != 0 && pA.y != 0) { //This is stupid TODO check how properly check for null objects
-		int decrement = -1;
-		int increment = 1;
-		int indexOfPointB;
-		Point cornerB = cv_getOuterCorner(fip_B, QRPos, indexOfPointB);
 		Point linePointB;
-		if (indexOfPointB == 0) {
-			decrement = 3;
-		}
-		else if (indexOfPointB == 3) {
-			increment = -1;
-		}
-		//the Point further away from the corner A will be the point with which a line for the Corner D can be built
-		if (cv_euclideanDist(pA, fip_B.shape[indexOfPointB + decrement]) > cv_euclideanDist(pA, fip_B.shape[indexOfPointB + increment]))
-			linePointB = fip_B.shape[indexOfPointB + decrement];
-		else
-			linePointB = fip_B.shape[indexOfPointB + increment];
-
-		int indexOfPointC;
-		Point cornerC = cv_getOuterCorner(fip_C, QRPos, indexOfPointC);
 		Point linePointC;
-		decrement = -1;
-		increment = 1;
-		if (indexOfPointC == 0) {
-			decrement = 3;
-		}
-		else if (indexOfPointC == 3) {
-			increment = -1;
-		}
 		//the Point further away from the corner A will be the point with which a line for the Corner D can be built
-		if (cv_euclideanDist(pA, fip_C.shape[indexOfPointC + decrement]) > cv_euclideanDist(pA, fip_C.shape[indexOfPointC + increment]))
-			linePointC = fip_C.shape[indexOfPointC + decrement];
+		if (cv_euclideanDist(pA, fip_B.shape[indexOfPointB + decrementB]) > cv_euclideanDist(pA, fip_B.shape[indexOfPointB + incrementB]))
+			linePointB = fip_B.shape[indexOfPointB + decrementB];
 		else
-			linePointC = fip_C.shape[indexOfPointC + increment];
+			linePointB = fip_B.shape[indexOfPointB + incrementB];
+
+		//the Point further away from the corner A will be the point with which a line for the Corner D can be built
+		if (cv_euclideanDist(pA, fip_C.shape[indexOfPointC + decrementC]) > cv_euclideanDist(pA, fip_C.shape[indexOfPointC + incrementC]))
+			linePointC = fip_C.shape[indexOfPointC + decrementC];
+		else
+			linePointC = fip_C.shape[indexOfPointC + incrementC];
 
 		cv_getIntersection(cornerB, linePointB, cornerC, linePointC, pD);
 		//cout << pD << endl;
@@ -601,8 +656,30 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 		//drawContours(image, vector<vector<Point> >(1, lnC), -1, Scalar(255, 255, 0), 3, 8);
 
 	}
-	else {
+	else { // if only diagonal FiPs a know we have to cross both lines
+		//generate all 4 lines
+		Point linePointB1 = fip_B.shape[indexOfPointB + decrementB];
+		Point linePointB2 = fip_B.shape[indexOfPointB + incrementB];
+		Point linePointC1 = fip_C.shape[indexOfPointC + decrementC];
+		Point linePointC2 = fip_C.shape[indexOfPointC + incrementC];
 
+		//find angle to see which are roughly parallel and which are not
+		float angle = cv_lineLineAngle(linePointB1, cornerB, linePointC1, cornerC); //Just try two if these are the parallel ones you know the two
+																					 //Pairs that cross
+		if (angle < 0.1) {
+			//both are parallel
+			cv_getIntersection(cornerB, linePointB2, cornerC, linePointC1, pD);
+			cv_getIntersection(cornerB, linePointB1, cornerC, linePointC2, pA);
+		}
+		else {
+			//both crossed
+			cv_getIntersection(cornerB, linePointB1, cornerC, linePointC1, pD);
+			cv_getIntersection(cornerB, linePointB2, cornerC, linePointC2, pA);
+		}
+
+		//try find two lines that cross for point (A)? how to check which point?
+		
+		//use other two to find the second point
 	}
 
 	return 0;
