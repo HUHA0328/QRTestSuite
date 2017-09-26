@@ -13,7 +13,6 @@
 using namespace std;
 using namespace cv;
 using namespace zbar;
-
 //###############################################################################
 // Initialization
 //###############################################################################
@@ -62,8 +61,9 @@ bool cv_inFiPRegTesting(vector<vector<Point>> &FiPRegs, vector<Point> Contour, v
 int cv_CandidateInRegion(vector<Point> contour, vector<vector<Point> > candidates);
 int cv_outputHisto(Mat input);
 float cross(Point2f v1, Point2f v2);
+String cv_getOrientation(Point a, Point b);
 //Decode Function
-int decode(Mat inputImg);
+int decode(Mat inputImage);
 
 //###############################################################################
 //Methods
@@ -509,7 +509,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			//check image quality before processing?
 			threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
 			imshow("QR code old", qr_thres);
-			waitKey(0);
+			//waitKey(0);
 		}
 
 
@@ -519,6 +519,8 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		int tag = qrPrevImage.tag + 1; //<- usually find next free tag - global variable?
 		QRCode newCode(tag);
 		newCode.pos = QRPos;
+		if (fipImage.size() == 3)
+			newCode.orientation = cv_getOrientation(pA, pD); //<- only do this if we had all threeFiPs so its sure that pD and pA are right
 
 		//here have a list that gets a new entry with the tag indentification pair
 
@@ -559,48 +561,9 @@ int cv_HarrisCorner(Mat img) {
 //###############################################################################
 //Decodation Support Function
 //###############################################################################
-int decode(Mat inputImg) {
-	ImageScanner scanner;
-	scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
-	// obtain image data  
-	//char file[256];
-	//cin >> file;
-	//Mat img = imread(file, 0);
-	Mat imgout;
-	//cvtColor(img, imgout, CV_GRAY2RGB);
-	int width = inputImg.cols;
-	int height = inputImg.rows;
-	uchar *raw = (uchar *)inputImg.data;
-	// wrap image data  
-	Image imageFile(width, height, "Y800", raw, width * height);
-	// scan the image for barcodes  
-	int n = scanner.scan(imageFile);
-	// extract results  
-	for (Image::SymbolIterator symbol = imageFile.symbol_begin();
-	symbol != imageFile.symbol_end();
-		++symbol) {
-		vector<Point> vp;
-		// do something useful with results  
-		cout << "decoded " << symbol->get_type_name()
-			<< " symbol \"" << symbol->get_data() << '"' << " " << endl;
-		int n = symbol->get_location_size();
-		for (int i = 0; i<n; i++) {
-			vp.push_back(Point(symbol->get_location_x(i), symbol->get_location_y(i)));
-		}
-		RotatedRect r = minAreaRect(vp);
-		Point2f pts[4];
-		r.points(pts);
-		for (int i = 0; i<4; i++) {
-			line(imgout, pts[i], pts[(i + 1) % 4], Scalar(255, 0, 0), 3);
-		}
-		cout << "Angle: " << r.angle << endl;
-	}
-	imshow("imgout.jpg", imgout);
-
-	waitKey(0);
+int decode(Mat inputImage) {
+	//ImageScanner scanner;
 }
-
-
 
 
 //###############################################################################
