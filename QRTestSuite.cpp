@@ -20,8 +20,8 @@ using namespace zbar;
 //#################		Tags
 const bool benchmark = true;
 const String benchmarktype = "stream"; //stream mp4, jpg, png <--- prob useless since no gain
-const bool debug = true;
-const bool showCalc = true;
+const bool debug = false;
+const bool showCalc = false;
 
 //#################		Global Variables
 Mat image; //back to multiFIPdetector
@@ -29,6 +29,7 @@ int64 e1, e2;
 float t;
 vector<float> allFPS;
 float avgFPS = 0.0, highFPS = 0.0, lowFPS = 999.0, globalFPS = 0.0; //FPS Performance Calculation happening global so minimal impact on algorithm
+int decoded = 0;
 vector<int> fips; //just saves the number of FiPs detected for Benchmark
 Point prevPos;
 
@@ -104,6 +105,8 @@ class QRCode { //Class for the QR-Code that saves all relevant information for o
 		FiP fip_a, fip_b, fip_c; //The finderpatterns
 		Point a, b, c, d; //the Corner Points
 		String orientation; //does it make sense to create a new class for this?
+		bool decode_success; //shows it was successfull decoded
+		String data; //gives the data -> maybe we want to sace this in a table with the tags so a possible parallel process wouldn't have to access the Object everytime
 		//int screenSize; //Size in ScreenSpace
 		//float realSize; //Size in Centimeters - probably 20cm 
 
@@ -158,6 +161,7 @@ int QRTest()
 	QRCode QRList = QRCode(0);
 	int solo = 0, partial = 0, full = 0, over = 0;
 	int frame = 0;
+	int decoded = 0;
 
 	// Creation of Intermediate 'Image' Objects required later
 	Mat empty(Size(100, 100), CV_MAKETYPE(image.depth(), 1));
@@ -211,6 +215,8 @@ int QRTest()
 			cout << "Frames partial        : " << ((float)partial / (float)frames) * 100 << "%" <<endl;  //two found
 			cout << "Frames full detection : " << ((float)full / (float)frames) * 100 << "%" << endl; //Three FiPs corrected or Reconstructed
 			cout << "Frames overshoot      : " << over << endl;
+			cout << "--------------QR decoded--------------" << endl;
+			cout << ((float)decoded / (float)frames) * 100 << endl;
 			//precicion?? <- we need ground truth
 			//QR Codes?? <- For multiple
 			//somehow measure how correct the guesses were ~ similar to precicion? 
@@ -226,7 +232,7 @@ int QRTest()
 		//Image Processing
 		FiPList = cv_FiPdetection(image, FiPList);
 		QRList = cv_QRdetection(FiPList, QRList);
-
+		decoded += QRList.decode_success;
 
 
 		
@@ -379,6 +385,8 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	Point QRPos;
 	FiP fip_A, fip_B, fip_C;
 	bool found = false;
+	bool success = false;
+
 	// process FiPs
 	fipImage = cv_getFiPOrder(fipImage);
 	// if 3 or 2 diagonal we already have the position
@@ -445,7 +453,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		return qrPrevImage; 
 	}
 	//if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
-	if ((cv_euclideanDist(qrPrevImage.pos, QRPos)) <= 150.0) {
+	if ((cv_euclideanDist(qrPrevImage.pos, QRPos)) <= 150.0 && qrPrevImage.decode_success==true) {
 		//cout << "direct" << endl;
 		return qrPrevImage;
 	}
@@ -510,7 +518,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
 			imshow("QR code old", qr_thres);
 			//waitKey(0);
-			decode(qr_thres);
+			success = decode(qr_thres);
 		}
 
 
@@ -520,6 +528,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		int tag = qrPrevImage.tag + 1; //<- usually find next free tag - global variable?
 		QRCode newCode(tag);
 		newCode.pos = QRPos;
+		newCode.decode_success = success;
 		if (fipImage.size() == 3)
 			newCode.orientation = cv_getOrientation(pA, pD); //<- only do this if we had all threeFiPs so its sure that pD and pA are right
 
@@ -528,9 +537,8 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		return newCode;
 	}
 
-	
 
-
+	cout << "THIS WILL NEVER BE REACHED" << endl;
 	// DEBUG CENTER POINT
 	if (debug == true) {
 		circle(image, QRPos, 2, Scalar(0, 0, 255), -1, 8, 0);
@@ -545,6 +553,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			prevPos = QRPos;
 		}
 	}
+
 
 	QRCode test(0);
 	return test;
@@ -565,6 +574,7 @@ int cv_HarrisCorner(Mat img) {
 int decode(Mat inputImage) {
 	ImageScanner scanner;
 	scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
+	int found = 0;
 	// obtain image data  
 	//char file[256];
 	//cin >> file;
@@ -584,25 +594,26 @@ int decode(Mat inputImage) {
 		++symbol) {
 		vector<Point> vp;
 		// do something useful with results  
-		cout << "decoded " << symbol->get_type_name()
-			<< " symbol \"" << symbol->get_data() << '"' << " " << endl;
-		int n = symbol->get_location_size();
-		for (int i = 0; i<n; i++) {
-			vp.push_back(Point(symbol->get_location_x(i), symbol->get_location_y(i)));
-		}
-		RotatedRect r = minAreaRect(vp);
-		Point2f pts[4];
-		r.points(pts);
-		for (int i = 0; i<4; i++) {
-			line(imgout, pts[i], pts[(i + 1) % 4], Scalar(255, 0, 0), 3);
-		}
-		cout << "Angle: " << r.angle << endl;
+		//cout << "decoded " << symbol->get_type_name()
+		//	<< " symbol \"" << symbol->get_data() << '"' << " " << endl;
+		//int n = symbol->get_location_size();
+		//for (int i = 0; i<n; i++) {
+		//	vp.push_back(Point(symbol->get_location_x(i), symbol->get_location_y(i)));
+		//}
+		//RotatedRect r = minAreaRect(vp);
+		//Point2f pts[4];
+		//r.points(pts);
+		//for (int i = 0; i<4; i++) {
+		//	line(imgout, pts[i], pts[(i + 1) % 4], Scalar(255, 0, 0), 3);
+		//}
+		//cout << "Angle: " << r.angle << endl;
+		found = 1;
 	}
 	//imshow("imgout.jpg", imgout);
 
 	//waitKey(0);
 
-	return 1;
+	return found;
 }
 
 
