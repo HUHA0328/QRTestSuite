@@ -510,6 +510,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
 			imshow("QR code old", qr_thres);
 			//waitKey(0);
+			decode(qr_thres);
 		}
 
 
@@ -562,7 +563,46 @@ int cv_HarrisCorner(Mat img) {
 //Decodation Support Function
 //###############################################################################
 int decode(Mat inputImage) {
-	//ImageScanner scanner;
+	ImageScanner scanner;
+	scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
+	// obtain image data  
+	//char file[256];
+	//cin >> file;
+	//Mat img = imread(file, 0);
+	Mat imgout;
+	//cvtColor(img, imgout, CV_GRAY2RGB);
+	int width = inputImage.cols;
+	int height = inputImage.rows;
+	uchar *raw = (uchar *)inputImage.data;
+	// wrap image data  
+	Image imageFile(width, height, "Y800", raw, width * height);
+	// scan the image for barcodes  
+	int n = scanner.scan(imageFile);
+	// extract results  
+	for (Image::SymbolIterator symbol = imageFile.symbol_begin();
+	symbol != imageFile.symbol_end();
+		++symbol) {
+		vector<Point> vp;
+		// do something useful with results  
+		cout << "decoded " << symbol->get_type_name()
+			<< " symbol \"" << symbol->get_data() << '"' << " " << endl;
+		int n = symbol->get_location_size();
+		for (int i = 0; i<n; i++) {
+			vp.push_back(Point(symbol->get_location_x(i), symbol->get_location_y(i)));
+		}
+		RotatedRect r = minAreaRect(vp);
+		Point2f pts[4];
+		r.points(pts);
+		for (int i = 0; i<4; i++) {
+			line(imgout, pts[i], pts[(i + 1) % 4], Scalar(255, 0, 0), 3);
+		}
+		cout << "Angle: " << r.angle << endl;
+	}
+	//imshow("imgout.jpg", imgout);
+
+	//waitKey(0);
+
+	return 1;
 }
 
 
