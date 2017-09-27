@@ -234,7 +234,6 @@ int QRTest()
 		QRList = cv_QRdetection(FiPList, QRList);
 		decoded += QRList.decode_success;
 
-
 		
 		int fipAmount = FiPList.size();
 		fips.push_back(fipAmount);
@@ -419,6 +418,10 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			fip_C = fipImage[1];
 			found = true;
 		}
+		else {
+			//Two parallel FiPs
+
+		}
 	}
 	// if 2 parallel possible position
 	// What could we do?
@@ -450,6 +453,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 
 	if (!found) { //This is for now since there is no reconstruction so only if I can actually do the calculations we continue
 		//cout << "not Found" << endl;
+		cout << "FiPs found" << fipImage.size() << endl;
 		return qrPrevImage; 
 	}
 	//if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
@@ -520,9 +524,6 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			//waitKey(0);
 			success = decode(qr_thres);
 		}
-
-
-
 
 		//If tag exists retag
 		int tag = qrPrevImage.tag + 1; //<- usually find next free tag - global variable?
@@ -620,6 +621,28 @@ int decode(Mat inputImage) {
 //###############################################################################
 //Detection Support Functions 
 //###############################################################################
+Point cv_findPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
+	Point newPos;
+
+	Point pA_1 = fip_A.shape[0];
+	Point pA_2 = fip_A.shape[2];
+
+	Point pB_1 = fip_B.shape[1];
+	Point pB_2 = fip_B.shape[3];
+
+	//shouldnt happen BUT check if parallel if yes switch one
+
+	//normale should Meet -- switch Both for other Point 
+
+	//get orientation from prevQR
+
+	//see which is the right Point and return
+
+
+
+	return newPos;
+}
+
 int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 	//gets the two Diagonal fips - bother other cornerPoints will be reconstructed from this
 	//if FiP_A is know the outermost Point should be given in
