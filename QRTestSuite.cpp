@@ -63,6 +63,7 @@ int cv_CandidateInRegion(vector<Point> contour, vector<vector<Point> > candidate
 int cv_outputHisto(Mat input);
 float cross(Point2f v1, Point2f v2);
 String cv_getOrientation(Point a, Point b);
+Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR);
 //Decode Function
 int decode(Mat inputImage);
 
@@ -420,8 +421,15 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		}
 		else {
 			//Two parallel FiPs
-
+			fip_A = fipImage[0];
+			fip_B = fipImage[1];
+			QRPos = cv_find2FipPos(fip_A, fip_B, qrPrevImage);
 		}
+	}
+	else if (fipImage.size() == 1) {
+		fip_A = fipImage[0];
+		//QRPos = cv_find1FiPPos(fip_A, qrPrevImage);
+		QRPos = qrPrevImage.pos;
 	}
 	// if 2 parallel possible position
 	// What could we do?
@@ -453,12 +461,14 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 
 	if (!found) { //This is for now since there is no reconstruction so only if I can actually do the calculations we continue
 		//cout << "not Found" << endl;
-		cout << "FiPs found" << fipImage.size() << endl;
+		//cout << "FiPs found" << fipImage.size() << endl;
+		qrPrevImage.pos = QRPos;
 		return qrPrevImage; 
 	}
 	//if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
 	if ((cv_euclideanDist(qrPrevImage.pos, QRPos)) <= 150.0 && qrPrevImage.decode_success==true) {
 		//cout << "direct" << endl;
+		qrPrevImage.pos = QRPos;
 		return qrPrevImage;
 	}
 	else {
@@ -621,9 +631,24 @@ int decode(Mat inputImage) {
 //###############################################################################
 //Detection Support Functions 
 //###############################################################################
-Point cv_findPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
-	Point newPos;
+Point cv_find1FiPPos(FiP fip_A, QRCode qrPrevImage) {
+	String orientation = qrPrevImage.orientation;
+	Point A1 = fip_A.shape[0];
+	Point A2 = fip_A.shape[1];
+	Point A3 = fip_A.shape[2];
+	Point A4 = fip_A.shape[3];
+	//Point distenceVectorPrev = qrPrevImage
 
+
+
+	//if (orientation == cv_getOrientation(fip_A.shape[0], fip_A.shape[2]))
+}
+
+Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
+	Point p_1;
+	Point p_2;
+	bool switched = false;
+		
 	Point pA_1 = fip_A.shape[0];
 	Point pA_2 = fip_A.shape[2];
 
@@ -631,16 +656,43 @@ Point cv_findPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
 	Point pB_2 = fip_B.shape[3];
 
 	//shouldnt happen BUT check if parallel if yes switch one
+	float angle = cv_lineLineAngle(pA_1, pA_2, pB_1, pB_2); 
 
-	//normale should Meet -- switch Both for other Point 
+	if (angle < 0.1) {
+		//both are parallel
+		Point pB_1 = fip_B.shape[0];
+		Point pB_2 = fip_B.shape[1];
+		switched = true;
+	}
+
+	//they should Meet -- switch Both for other Point 
+	cv_getIntersection(pA_1, pA_2, pB_1, pB_2, p_1);
+
+	if (!switched) {
+		Point pA_1 = fip_A.shape[1];
+		Point pA_2 = fip_A.shape[3];
+
+		Point pB_1 = fip_B.shape[0];
+		Point pB_2 = fip_B.shape[2];
+	}
+	else {
+		Point pA_1 = fip_A.shape[1];
+		Point pA_2 = fip_A.shape[3];
+
+		Point pB_1 = fip_B.shape[1];
+		Point pB_2 = fip_B.shape[3];
+	}
+	cv_getIntersection(pA_1, pA_2, pB_1, pB_2, p_2);
 
 	//get orientation from prevQR
-
-	//see which is the right Point and return
-
-
-
-	return newPos;
+	String orientation = prevQR.orientation; 
+	//the Point that has the same orientation to one of the known FiPs is the right Point
+	if (orientation == cv_getOrientation(pA_1, p_1))
+		return p_1;
+	else if (orientation == cv_getOrientation(pA_2, p_1))
+		return p_1;
+	else
+		return p_2;
 }
 
 int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
