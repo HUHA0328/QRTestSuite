@@ -32,6 +32,7 @@ float avgFPS = 0.0, highFPS = 0.0, lowFPS = 999.0, globalFPS = 0.0; //FPS Perfor
 int decoded = 0;
 vector<int> fips; //just saves the number of FiPs detected for Benchmark
 Point prevPos;
+int tagnumber = 0;
 
 //#################		Classes
 class FiP;
@@ -217,7 +218,8 @@ int QRTest()
 			cout << "Frames full detection : " << ((float)full / (float)frames) * 100 << "%" << endl; //Three FiPs corrected or Reconstructed
 			cout << "Frames overshoot      : " << over << endl;
 			cout << "--------------QR decoded--------------" << endl;
-			cout << ((float)decoded / (float)frames) * 100 << endl;
+			cout << "QRCode identified     : " << ((float)decoded / (float)frames) * 100 << endl;
+			cout << "tags given out        : " << tagnumber << endl;
 			//precicion?? <- we need ground truth
 			//QR Codes?? <- For multiple
 			//somehow measure how correct the guesses were ~ similar to precicion? 
@@ -524,7 +526,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 
 			cvtColor(qr, qr_gray, CV_RGB2GRAY);
 			//sharpen Image attempt Gaussian Blurr failed
-			//GaussianBlur(qr_gray, qr_gray_sharp, Size(3,3), 1);
+			//GaussianBlur(qr_gray, qr_gray_sharp, Size(3,3), 1);t
 			//addWeighted(qr_gray, 1.5, qr_gray_sharp, -0.5, 0, qr_gray_sharp);
 			//threshold(qr_gray_sharp, qr_thres, 130, 255, CV_THRESH_BINARY);
 			//imshow("QR code", qr_thres);
@@ -536,7 +538,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		}
 
 		//If tag exists retag
-		int tag = qrPrevImage.tag + 1; //<- usually find next free tag - global variable?
+		int tag = tagnumber++; //<- usually find next free tag - global variable?
 		QRCode newCode(tag);
 		newCode.pos = QRPos;
 		newCode.decode_success = success;
