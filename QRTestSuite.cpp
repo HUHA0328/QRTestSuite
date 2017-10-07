@@ -20,11 +20,10 @@ using namespace zbar;
 //#################		Tags
 const bool benchmark = true;
 const String benchmarktype = "stream"; //stream mp4, jpg, png <--- prob useless since no gain
-const bool debug = false;
-const bool showCalc = false;
+const bool debug = true;
+const bool showCalc = true;
 
 //#################		Global Variables
-Mat image; //back to multiFIPdetector
 int64 e1, e2;
 float t;
 vector<float> allFPS;
@@ -33,6 +32,10 @@ int decoded = 0;
 vector<int> fips; //just saves the number of FiPs detected for Benchmark
 Point prevPos;
 int tagnumber = 0;
+vector<string> tagDataMap;
+
+//#################		Images
+Mat image; //back to multiFIPdetector
 
 //#################		Classes
 class FiP;
@@ -164,6 +167,8 @@ int QRTest()
 	int solo = 0, partial = 0, full = 0, over = 0;
 	int frame = 0;
 	int decoded = 0;
+	//intitialize QRDataList
+	tagDataMap.push_back("String begin");
 
 	// Creation of Intermediate 'Image' Objects required later
 	Mat empty(Size(100, 100), CV_MAKETYPE(image.depth(), 1));
@@ -173,8 +178,12 @@ int QRTest()
 	}
 	else {
 		if (benchmarktype == "stream")
-			capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/720p-dist-move.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure-HQ.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-leaving.mp4");
+			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
 		else if (benchmarktype == "jpg")
 			capture.open("C:/Users/Frederik/Desktop/VidTests/720-frame-jpg/image-%05d.jpg");
 		else if (benchmarktype == "png")
@@ -220,6 +229,7 @@ int QRTest()
 			cout << "--------------QR decoded--------------" << endl;
 			cout << "QRCode identified     : " << ((float)decoded / (float)frames) * 100 << endl;
 			cout << "tags given out        : " << tagnumber << endl;
+			cout << tagDataMap.at(0) << endl;
 			//precicion?? <- we need ground truth
 			//QR Codes?? <- For multiple
 			//somehow measure how correct the guesses were ~ similar to precicion? 
@@ -230,8 +240,8 @@ int QRTest()
 		//Reset of Variables
 		//vector<vector<Point> > finderPatterns;
 		//vector<vector<Point> > finderCandidate;
-
-
+		
+		
 		//Image Processing
 		FiPList = cv_FiPdetection(image, FiPList);
 		QRList = cv_QRdetection(FiPList, QRList);
@@ -255,7 +265,7 @@ int QRTest()
 		if (fipAmount > 3) {
 			over++;
 		}
-
+		
 		//Debug Rendering
 		if (showCalc)
 			imshow("image", image);
@@ -291,21 +301,23 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	updated.clear();
 
 	cvtColor(inputImage, inputImage, CV_RGB2GRAY);										// Convert Image captured from Image Input to GrayScale	
+
 	
 	resize(inputImage, inputImage, Size(inputImage.size().width / 2, inputImage.size().height / 2));
-	threshold(inputImage, inputImage, 100, 150, THRESH_BINARY);							//<- Probably some kind of local threshold better in the Areas of Interest 
+	//resize(inputImage, inputImage, Size(640, 360));
+	threshold(inputImage, inputImage, 180, 255, THRESH_BINARY);							//<- Probably some kind of local threshold better in the Areas of Interest 
+	imshow("debug", inputImage);
 	resize(inputImage, inputImage, Size(inputImage.size().width * 2, inputImage.size().height * 2));
+	//resize(inputImage, inputImage, Size(1920, 1080));
 
 	//imshow("debug", inputImage);
 
 	Canny(inputImage, inputImage, 80, 150, 3);											// Apply Canny edge detection on the gray image
 	findContours(inputImage, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
-
-
+	imshow("debugContours", inputImage);
 
 	for (int i = 0; i < contours.size(); i++)
 	{
-
 		//Find the approximated polygon of the contour we are examining
 		approxPolyDP(contours[i], pointsseq, arcLength(contours[i], true)*0.02, true); // <- this somehow doesnt work
 		if (pointsseq.size() == 4)      // only quadrilaterals contours are examined // <- this neither or I misunderstand it
@@ -320,6 +332,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 				c = c + 1;
 				//testo++;
 			}
+
 			/*if (hierarchy[k][2] != -1)
 			cout << "WARNING";
 			c = c + 1;*/
@@ -350,8 +363,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 
 				//if Center in a FiPReg //TODO: decide if marked as found or put a connection so that possible multiples can be detected but that shouldnt happen so how would the problem be solved?
-			}
-			if (c = 4) {
+			} else if (c = 4) { // there was an = all the time???
 				approxPolyDP(contours[k], pointsseq, arcLength(contours[i], true)*0.02, true);
 				if (pointsseq.size() == 4) {
 					if (isContourConvex(pointsseq)) {
@@ -359,7 +371,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 							finderCandidate.push_back(contours[k]);
 							//cout << "Candidate area:  " << contourArea(contours[k]) << "\n";
 							if (showCalc == true) {
-								//drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 255, 0), 1, 8);
+								drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 255, 0), 1, 8);
 							}
 							//size++;
 						}
@@ -371,7 +383,8 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 
 			}
-
+			else
+				i += c;
 		}
 	}
 
@@ -384,6 +397,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 }
 
 QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
+	QRCode returnCode(0);
 	Point QRPos;
 	FiP fip_A, fip_B, fip_C;
 	bool found = false;
@@ -392,6 +406,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	// process FiPs
 	fipImage = cv_getFiPOrder(fipImage);
 	// if 3 or 2 diagonal we already have the position
+	//cout << fipImage.size() << endl;
 	if (fipImage.size() == 3) {
 		if (fipImage[0].relPos == 0) {
 			QRPos = (fipImage[1].pos + fipImage[2].pos)*.5;
@@ -465,13 +480,12 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		//cout << "not Found" << endl;
 		//cout << "FiPs found" << fipImage.size() << endl;
 		qrPrevImage.pos = QRPos;
-		return qrPrevImage; 
-	}
-	//if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
-	if ((cv_euclideanDist(qrPrevImage.pos, QRPos)) <= 150.0 && qrPrevImage.decode_success==true) {
+		returnCode = qrPrevImage;
+	} else if((cv_euclideanDist(qrPrevImage.pos, QRPos)) <= 150.0 && qrPrevImage.decode_success == true) {
+		//if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
 		//cout << "direct" << endl;
 		qrPrevImage.pos = QRPos;
-		return qrPrevImage;
+		returnCode = qrPrevImage;
 	}
 	else {
 		//Identify
@@ -531,7 +545,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			//threshold(qr_gray_sharp, qr_thres, 130, 255, CV_THRESH_BINARY);
 			//imshow("QR code", qr_thres);
 			//check image quality before processing?
-			threshold(qr_gray, qr_thres, 127, 255, CV_THRESH_BINARY);
+			threshold(qr_gray, qr_thres, 180, 255, CV_THRESH_BINARY);
 			imshow("QR code old", qr_thres);
 			//waitKey(0);
 			success = decode(qr_thres);
@@ -547,15 +561,15 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 
 		//here have a list that gets a new entry with the tag indentification pair
 
-		return newCode;
+		returnCode = newCode;
 	}
 
 
-	cout << "THIS WILL NEVER BE REACHED" << endl;
+	//cout << "THIS WILL NEVER BE REACHED" << endl;
 	// DEBUG CENTER POINT
 	if (debug == true) {
-		circle(image, QRPos, 2, Scalar(0, 0, 255), -1, 8, 0);
-		if (found) {
+		circle(image, QRPos, 10, Scalar(0, 0, 255), -1, 8, 0);
+		/*if (found) {
 			try {
 				float dist = cv_vectorSize(prevPos - QRPos);
 				if (dist>=150.0)
@@ -564,12 +578,10 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			catch (const std::exception&) {}
 
 			prevPos = QRPos;
-		}
+		}*/
 	}
 
-
-	QRCode test(0);
-	return test;
+	return returnCode;
 }
 
 //Horrible Performance
@@ -644,6 +656,7 @@ Point cv_find1FiPPos(FiP fip_A, QRCode qrPrevImage) {
 
 
 	//if (orientation == cv_getOrientation(fip_A.shape[0], fip_A.shape[2]))
+	return Point(0, 0); // <-debug
 }
 
 Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
@@ -688,6 +701,7 @@ Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
 
 	//get orientation from prevQR
 	String orientation = prevQR.orientation; 
+	cout << orientation << endl;
 	//the Point that has the same orientation to one of the known FiPs is the right Point
 	if (orientation == cv_getOrientation(pA_1, p_1))
 		return p_1;
@@ -1014,7 +1028,7 @@ bool cv_inRect(vector<Point> rectangle, Point p) { //ToDo: need knowledge in whi
 //For testing checks if Contour Center is in any Contour -- makes it easier to refresh  -- check which should be used later
 bool cv_inFiPRegTesting(vector<vector<Point>>& FiPRegs, vector<Point> Contour, vector<bool>& updated) {
 	Point p = cv_getCentroid(Contour);
-	//circle(image, p, 2, Scalar(255, 0, 0), -1, 8, 0);
+	//circle(image, p, 10, Scalar(255, 0, 0), -1, 8, 0);
 	int index = 0;
 	if (FiPRegs.empty()) return false;
 	for (std::vector<vector<Point>>::iterator it = FiPRegs.begin(); it != FiPRegs.end(); ++it) {
