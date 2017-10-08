@@ -244,6 +244,7 @@ int QRTest()
 		
 		//Image Processing
 		FiPList = cv_FiPdetection(image, FiPList);
+
 		QRList = cv_QRdetection(FiPList, QRList);
 		decoded += QRList.decode_success;
 
@@ -306,7 +307,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	resize(inputImage, inputImage, Size(inputImage.size().width / 2, inputImage.size().height / 2));
 	//resize(inputImage, inputImage, Size(640, 360));
 	threshold(inputImage, inputImage, 180, 255, THRESH_BINARY);							//<- Probably some kind of local threshold better in the Areas of Interest 
-	imshow("debug", inputImage);
+	//imshow("debug", inputImage);
 	resize(inputImage, inputImage, Size(inputImage.size().width * 2, inputImage.size().height * 2));
 	//resize(inputImage, inputImage, Size(1920, 1080));
 
@@ -314,7 +315,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 	Canny(inputImage, inputImage, 80, 150, 3);											// Apply Canny edge detection on the gray image
 	findContours(inputImage, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
-	imshow("debugContours", inputImage);
+	//imshow("debugContours", inputImage);
 
 	for (int i = 0; i < contours.size(); i++)
 	{
@@ -363,7 +364,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 
 				//if Center in a FiPReg //TODO: decide if marked as found or put a connection so that possible multiples can be detected but that shouldnt happen so how would the problem be solved?
-			} else if (c = 4) { // there was an = all the time???
+			} /*else if (c = 4) { // there was an = all the time???
 				approxPolyDP(contours[k], pointsseq, arcLength(contours[i], true)*0.02, true);
 				if (pointsseq.size() == 4) {
 					if (isContourConvex(pointsseq)) {
@@ -382,7 +383,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 				//all++;
 
 
-			}
+			} */
 			else
 				i += c;
 		}
@@ -392,7 +393,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 		Point Center = cv_getCentroid(fip);
 		fipList.push_back(FiP(Center, fip));
 	}
-
+	drawContours(image, fiPReg, -1, Scalar(0, 0, 255), 1, 8);
 	return fipList;
 }
 
@@ -672,11 +673,12 @@ Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
 
 	//shouldnt happen BUT check if parallel if yes switch one
 	float angle = cv_lineLineAngle(pA_1, pA_2, pB_1, pB_2); 
-
-	if (angle < 0.1) {
+	
+	
+	if (angle > 0.1) {
 		//both are parallel
-		Point pB_1 = fip_B.shape[0];
-		Point pB_2 = fip_B.shape[1];
+		pB_1 = fip_B.shape[0];
+		pB_2 = fip_B.shape[2];
 		switched = true;
 	}
 
@@ -684,28 +686,43 @@ Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
 	cv_getIntersection(pA_1, pA_2, pB_1, pB_2, p_1);
 
 	if (!switched) {
-		Point pA_1 = fip_A.shape[1];
-		Point pA_2 = fip_A.shape[3];
+		pA_1 = fip_A.shape[1];
+		pA_2 = fip_A.shape[3];
 
-		Point pB_1 = fip_B.shape[0];
-		Point pB_2 = fip_B.shape[2];
+		pB_1 = fip_B.shape[0];
+		pB_2 = fip_B.shape[2];
 	}
 	else {
-		Point pA_1 = fip_A.shape[1];
-		Point pA_2 = fip_A.shape[3];
+		pA_1 = fip_A.shape[1];
+		pA_2 = fip_A.shape[3];
 
-		Point pB_1 = fip_B.shape[1];
-		Point pB_2 = fip_B.shape[3];
+		pB_1 = fip_B.shape[1];
+		pB_2 = fip_B.shape[3];
 	}
+
 	cv_getIntersection(pA_1, pA_2, pB_1, pB_2, p_2);
 
 	//get orientation from prevQR
 	String orientation = prevQR.orientation; 
-	cout << orientation << endl;
+	/*cout << orientation << endl;
+	cout << cv_getOrientation(pA_1, p_1) << endl;
+	cout << cv_getOrientation(pB_1, p_1) << endl;
+	cout << cv_getOrientation(pA_1, p_2) << endl;
+	cout << cv_getOrientation(pB_1, p_2) << endl;
+	cout << "---------------------------" << endl;
+
+	circle(image, pA_1, 2, Scalar(255, 0, 0), -1, 8, 0);
+	circle(image, pA_2, 2, Scalar(255, 0, 0), -1, 8, 0);
+	circle(image, pB_1, 2, Scalar(0, 255, 0), -1, 8, 0);
+	circle(image, pB_2, 2, Scalar(0, 255, 0), -1, 8, 0);
+	circle(image, p_1, 5, Scalar(255, 255, 0), -1, 8, 0);
+	circle(image, p_2, 2, Scalar(255, 255, 255), -1, 8, 0);
+	imshow("dots", image);
+	waitKey(0);*/
 	//the Point that has the same orientation to one of the known FiPs is the right Point
 	if (orientation == cv_getOrientation(pA_1, p_1))
 		return p_1;
-	else if (orientation == cv_getOrientation(pA_2, p_1))
+	else if (orientation == cv_getOrientation(pB_2, p_1))
 		return p_1;
 	else
 		return p_2;
