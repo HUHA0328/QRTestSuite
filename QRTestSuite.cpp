@@ -20,8 +20,8 @@ using namespace zbar;
 //#################		Tags
 const bool benchmark = true;
 const String benchmarktype = "stream"; //stream mp4, jpg, png <--- prob useless since no gain
-const bool debug = true;
-const bool showCalc = true;
+const bool debug = false;
+const bool showCalc = false;
 
 //#################		Global Variables
 int64 e1, e2;
@@ -354,12 +354,12 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 				// the first part is only for the Candidates
 				vector<Point> fipSquare;
 				approxPolyDP(contours[k - c], fipSquare, arcLength(contours[i], true)*0.02, true);
-				if (!cv_inFiPRegTesting(fiPReg, fipSquare, updated)) {
+				//if (!cv_inFiPRegTesting(fiPReg, fipSquare, updated)) {
 					fiPReg.push_back(fipSquare);
 					//updated[updated.size() - 1].flip();// = true;
-					updated.push_back(true);
+				//	updated.push_back(true);
 					//cout << fiPReg.size() << "\n";
-				}
+				//}
 
 
 
