@@ -31,7 +31,7 @@ float avgFPS = 0.0, highFPS = 0.0, lowFPS = 999.0, globalFPS = 0.0; //FPS Perfor
 int decoded = 0;
 vector<int> fips; //just saves the number of FiPs detected for Benchmark
 Point prevPos;
-int tagnumber = 0;
+//int tagnumber = 0;
 vector<string> tagDataMap;
 
 //#################		Images
@@ -53,6 +53,7 @@ int cv_HarrisCorner(Mat img);
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered);
 
 //#################		Support Methods
+int findTaginList(String inputData);
 int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos);
 Point cv_getOuterCorner(FiP fip, Point center);
 Point cv_getOuterCorner(FiP fip, Point center, int& index);
@@ -68,15 +69,15 @@ int cv_outputHisto(Mat input);
 float cross(Point2f v1, Point2f v2);
 String cv_getOrientation(Point a, Point b);
 Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR);
-//Decode Function
-int decode(Mat inputImage);
+//ZBAR Decode Function
+String decode(Mat inputImage);
 
 //###############################################################################
 //Methods
 //###############################################################################
 class FiP {
 public:
-	FiP();
+	FiP ();
 	FiP (int pRelPos);
 	FiP (Point pPos, vector<Point> pShape);
 	Point pos;
@@ -182,8 +183,8 @@ int QRTest()
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/720p-dist-move.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure-HQ.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-leaving.mp4");
-			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
+			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
 		else if (benchmarktype == "jpg")
 			capture.open("C:/Users/Frederik/Desktop/VidTests/720-frame-jpg/image-%05d.jpg");
 		else if (benchmarktype == "png")
@@ -228,8 +229,9 @@ int QRTest()
 			cout << "Frames overshoot      : " << over << endl;
 			cout << "--------------QR decoded--------------" << endl;
 			cout << "QRCode identified     : " << ((float)decoded / (float)frames) * 100 << endl;
-			cout << "tags given out        : " << tagnumber << endl;
-			cout << tagDataMap.at(0) << endl;
+			cout << "tags given out        : " << tagDataMap.size() << endl;
+			for (int zi = 0; zi < tagDataMap.size(); zi++)
+				cout << tagDataMap.at(zi) << endl;
 			//precicion?? <- we need ground truth
 			//QR Codes?? <- For multiple
 			//somehow measure how correct the guesses were ~ similar to precicion? 
@@ -403,6 +405,8 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	FiP fip_A, fip_B, fip_C;
 	bool found = false;
 	bool success = false;
+	String qrData = "";
+	int tag;
 
 	// process FiPs
 	fipImage = cv_getFiPOrder(fipImage);
@@ -445,28 +449,18 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 		}
 	}
 	else if (fipImage.size() == 1) {
+		// if 1 check possible positions
+		// What could we do?
+		// check if there is a tag expected in the radius?
+		// ignore might work best? (only if this happens rarely which seems to be the case)
 		fip_A = fipImage[0];
 		//QRPos = cv_find1FiPPos(fip_A, qrPrevImage);
 		QRPos = qrPrevImage.pos;
 	}
-	// if 2 parallel possible position
-	// What could we do?
-	// check if there is a tag expected in one of the two possible position and then accept that
-	// if 1 check possible positions
-	// What could we do?
-	// check if there is a tag expected in the radius?
-	// ignore might work best? (only if this happens rarely which seems to be the case)
-	// check if there is tag for the Pos
-
-
-
-	// if yes load data from app
-
-	// if no reconstruct planar QR code and load data
 
 	// check if tag exists else give new one
 	// we want a distance to a tag from a previous image to check if this is the same tag
-	//	this could create problems when there are overlaying tags
+	// this could create problems when there are overlaying tags
 	// It would be clever to have this distance to change depending on the movement speed/ turning speed
 	// With a normal movement the distance between the centers rarely goes over 50 pixels but with rapid movements it tends to get far higher
 	// can we approximate the speed just by the picture in a really fast way? Or should we just describe that here a injection of attributes send by
@@ -480,15 +474,20 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 	if (!found) { //This is for now since there is no reconstruction so only if I can actually do the calculations we continue
 		//cout << "not Found" << endl;
 		//cout << "FiPs found" << fipImage.size() << endl;
-		qrPrevImage.pos = QRPos;
-		returnCode = qrPrevImage;
+		//qrPrevImage.pos = QRPos;
+		//If none is found return a QRCode with tag 0
+		returnCode = QRCode(0);
 	} else if((cv_euclideanDist(qrPrevImage.pos, QRPos)) <= 150.0 && qrPrevImage.decode_success == true) {
+		// check if there is tag for the Pos
+		// if yes load data from app
+
 		//if (cv_vectorSize(qrPrevImage.pos - QRPos) <= 150.0) {
 		//cout << "direct" << endl;
 		qrPrevImage.pos = QRPos;
 		returnCode = qrPrevImage;
 	}
 	else {
+		// if no reconstruct planar QR code and load data
 		//Identify
 		
 		//get CornerPointA in Case it exists already
@@ -527,12 +526,6 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 
 		Mat warp_matrix;
 
-		//cout << "draw" << endl;
-		//cout << qrImg.size() << endl;
-		//cout << dst.size() << endl;
-		//drawContours(image, vector<vector<Point2f> >(1.0, qrImg), -1, Scalar(0, 0, 255), 1, 8);
-		//imshow("contour", image);
-		//waitKey(0);
 		if (qrImg.size() == 4 && dst.size() == 4)			// Failsafe for WarpMatrix Calculation to have only 4 Points with src and dst
 		{
 			warp_matrix = getPerspectiveTransform(qrImg, dst);
@@ -540,25 +533,31 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			copyMakeBorder(qr_raw, qr, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255));
 
 			cvtColor(qr, qr_gray, CV_RGB2GRAY);
-			//sharpen Image attempt Gaussian Blurr failed
-			//GaussianBlur(qr_gray, qr_gray_sharp, Size(3,3), 1);t
-			//addWeighted(qr_gray, 1.5, qr_gray_sharp, -0.5, 0, qr_gray_sharp);
-			//threshold(qr_gray_sharp, qr_thres, 130, 255, CV_THRESH_BINARY);
-			//imshow("QR code", qr_thres);
+
 			//check image quality before processing?
 			threshold(qr_gray, qr_thres, 180, 255, CV_THRESH_BINARY);
 			imshow("QR code old", qr_thres);
 			//waitKey(0);
-			success = decode(qr_thres);
+			qrData = decode(qr_thres);
+			if (qrData != "ERROR")
+				success = true;
+			else
+				success = false;
 		}
 
 		//If tag exists retag
-		int tag = tagnumber++; //<- usually find next free tag - global variable?
+		tag = findTaginList(qrData);
+		if (tag == tagDataMap.size())
+			tagDataMap.push_back(qrData);
+		//int tag = tagnumber++; //<- usually find next free tag - global variable?
+
+		//create QRCode Object
 		QRCode newCode(tag);
 		newCode.pos = QRPos;
 		newCode.decode_success = success;
-		if (fipImage.size() == 3)
-			newCode.orientation = cv_getOrientation(pA, pD); //<- only do this if we had all threeFiPs so its sure that pD and pA are right
+
+		//if (fipImage.size() == 3) //<- only do this if we had all threeFiPs so its sure that pD and pA are right - not sure if this is the best idea anymore.
+		newCode.orientation = cv_getOrientation(pA, pD); 
 
 		//here have a list that gets a new entry with the tag indentification pair
 
@@ -597,10 +596,11 @@ int cv_HarrisCorner(Mat img) {
 //###############################################################################
 //Decodation Support Function
 //###############################################################################
-int decode(Mat inputImage) {
+String decode(Mat inputImage) {
 	ImageScanner scanner;
 	scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
-	int found = 0;
+	bool found = false;
+	String output;
 	// obtain image data  
 	//char file[256];
 	//cin >> file;
@@ -618,28 +618,14 @@ int decode(Mat inputImage) {
 	for (Image::SymbolIterator symbol = imageFile.symbol_begin();
 	symbol != imageFile.symbol_end();
 		++symbol) {
-		vector<Point> vp;
-		// do something useful with results  
-		//cout << "decoded " << symbol->get_type_name()
-		//	<< " symbol \"" << symbol->get_data() << '"' << " " << endl;
-		//int n = symbol->get_location_size();
-		//for (int i = 0; i<n; i++) {
-		//	vp.push_back(Point(symbol->get_location_x(i), symbol->get_location_y(i)));
-		//}
-		//RotatedRect r = minAreaRect(vp);
-		//Point2f pts[4];
-		//r.points(pts);
-		//for (int i = 0; i<4; i++) {
-		//	line(imgout, pts[i], pts[(i + 1) % 4], Scalar(255, 0, 0), 3);
-		//}
-		//cout << "Angle: " << r.angle << endl;
-		found = 1;
+		output = symbol->get_data();
+		found = true;
 	}
-	//imshow("imgout.jpg", imgout);
 
-	//waitKey(0);
-
-	return found;
+	if (found)
+		return output;
+	else
+		return "ERROR";
 }
 
 
@@ -704,21 +690,7 @@ Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
 
 	//get orientation from prevQR
 	String orientation = prevQR.orientation; 
-	/*cout << orientation << endl;
-	cout << cv_getOrientation(pA_1, p_1) << endl;
-	cout << cv_getOrientation(pB_1, p_1) << endl;
-	cout << cv_getOrientation(pA_1, p_2) << endl;
-	cout << cv_getOrientation(pB_1, p_2) << endl;
-	cout << "---------------------------" << endl;
 
-	circle(image, pA_1, 2, Scalar(255, 0, 0), -1, 8, 0);
-	circle(image, pA_2, 2, Scalar(255, 0, 0), -1, 8, 0);
-	circle(image, pB_1, 2, Scalar(0, 255, 0), -1, 8, 0);
-	circle(image, pB_2, 2, Scalar(0, 255, 0), -1, 8, 0);
-	circle(image, p_1, 5, Scalar(255, 255, 0), -1, 8, 0);
-	circle(image, p_2, 2, Scalar(255, 255, 255), -1, 8, 0);
-	imshow("dots", image);
-	waitKey(0);*/
 	//the Point that has the same orientation to one of the known FiPs is the right Point
 	if (orientation == cv_getOrientation(pA_1, p_1))
 		return p_1;
@@ -767,15 +739,6 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 			linePointC = fip_C.shape[indexOfPointC + incrementC];
 
 		cv_getIntersection(cornerB, linePointB, cornerC, linePointC, pD);
-		//cout << pD << endl;
-		//vector<Point> lnB;
-		//vector<Point> lnC;
-		//lnB.push_back(cornerB);
-		//lnB.push_back(linePointB);
-		//lnC.push_back(cornerC);
-		//lnC.push_back(linePointC);
-		//drawContours(image, vector<vector<Point> >(1, lnB), -1, Scalar(255, 0, 0), 3, 8);
-		//drawContours(image, vector<vector<Point> >(1, lnC), -1, Scalar(255, 255, 0), 3, 8);
 
 	}
 	else { // if only diagonal FiPs a know we have to cross both lines
@@ -904,43 +867,21 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 	return unordered;
 }
 
-vector<FiP> cv_reconstructMissingFiP(vector<FiP> orderedFiP) {
-	
-	vector<FiP> reconstructed;
-
-
-	return reconstructed;
-}
-
-vector<Point> cv_getCornerPoints(vector<FiP> orderedReconstructedFiP) {
-														//gets FiPs already in order and should return the points that make up the
-														//Corners of the QR Codes
-														//Returns a vector of Points making up the full Squares
-	vector<Point> QRshape;
-
-
-	return QRshape;
-}
-
-
 //###############################################################################
 //General Support Functions 
 //###############################################################################
+int findTaginList(String inputData) { //finds the tag if the QR code was already saved else gives out the next free tag 
+	int tag = 0;
+
+	for (int i = 0; i < tagDataMap.size(); i++) {
+		if (tagDataMap[i] == inputData)
+			return i;
+	}
+	return tagDataMap.size();
+}
+
 bool cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& res) {
 	//Gets the intersectionPoint from 2 lines denoted by a1 a2 and b1 b2
-	/*Point x = a2 - a1;
-	Point d1 = b1 - a1;
-	Point d2 = b2 - a2;
-
-	float cross = (d1.x*d2.y) - (d1.y*d2.x);
-	if (abs(cross) < /*EPS*//*1e-8) {
-		cout << "FALSE" << endl;
-		return false;
-	}
-		
-	double t1 = ((x.x * d2.y) - (x.y * d2.x)) / cross;
-	r = a1 + (d1 * t1);
-	return true;*/
 	Point p = a1;
 	Point q = b1;
 	Point r(a2 - a1);
@@ -967,7 +908,7 @@ bool cv_inRegion(Point center, int radius, Point newPoint) { //gives out true if
 }
 
 float cv_lineLineAngle(Point l1_1, Point l1_2, Point l2_1, Point l2_2) { //Gets the angle that is between two lines denoted by their start and end Points
-	//return ((l1_2.x - l1_1.x)*(l2_2.x - l2_1.x)) / (abs(l1_2.x - l1_1.x)*abs(l2_2.x - l2_1.x)); //<-- please test http://mathworld.wolfram.com/Line-LineAngle.html
+	// http://mathworld.wolfram.com/Line-LineAngle.html
 	return ((l1_2 - l1_1).dot(l2_2 - l2_1)) / (cv_vectorSize(l1_2 - l1_1)*cv_vectorSize(l2_2 - l2_1));
 }
 
@@ -1049,7 +990,7 @@ bool cv_inFiPRegTesting(vector<vector<Point>>& FiPRegs, vector<Point> Contour, v
 	int index = 0;
 	if (FiPRegs.empty()) return false;
 	for (std::vector<vector<Point>>::iterator it = FiPRegs.begin(); it != FiPRegs.end(); ++it) {
-		//cout << "NUMBER :  " << index << "\n";
+
 		if (cv_inRect(*it, p)) {
 			// do the refresh here for testing later move it out but give back the index so we can do a different refresh for candidates
 			//vector<Point> test = FiPRegs[index];// = Contour; // solve with pointers?
@@ -1079,98 +1020,3 @@ int cv_CandidateInRegion(vector<Point> contour, vector<vector<Point> > candidate
 	}
 	return -1;
 }
-
-//Old Method that loaded all Pictures into Memory -- bit faster so maybe of use again at some point
-/*
-int imageLoadTest() {
-vector<Mat> images;
-Mat image;
-String number = "";
-bool moreFiles = true;
-int i = 0;
-int j = 0;
-int key = 0;
-vector<int> timePassedAll;
-vector<float> fpsAll;
-// Creation of Intermediate 'Image' Objects required later
-Mat gray(image.size(), CV_MAKETYPE(image.depth(), 1));			// To hold Grayscale Image
-Mat edges(image.size(), CV_MAKETYPE(image.depth(), 1));			// To hold Grayscale Image
-Mat traces(image.size(), CV_8UC3);								// For Debug Visuals
-Mat empty(Size(100,100), CV_MAKETYPE(image.depth(), 1));
-
-vector<vector<Point> > contours;
-vector<vector<Point> > fiPReg;
-vector<Vec4i> hierarchy;
-vector<Point> pointsseq;    //used to save the approximated sides of each contour
-
-while (moreFiles) {
-number = to_string(i);
-while (number.size() < 7) {
-number = "0" + number;
-}
-cout << number << endl;
-image = imread("C:/Users/Frederik/Desktop/VidTests/720-frame-png/image-" + number + ".png");
-
-if (image.data == NULL) {
-cerr << "No More Files" << endl;
-moreFiles = false;
-}
-else {
-images.push_back(image);
-}
-i++;
-}
-
-chronoNow = chrono::system_clock::now();
-
-while (key != 'q') //Main Computation Loop
-{
-
-chronoPrev = chronoNow;
-chronoNow = chrono::system_clock::now();
-
-image = images.at(j);
-
-
-//Image Processing
-cvtColor(image, gray, CV_RGB2GRAY);		// Convert Image captured from Image Input to GrayScale
-//medianBlur(gray, gray, 3);
-Canny(gray, edges, 150, 200, 3);		// Apply Canny edge detection on the gray image
-findContours(edges, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
-
-//Time Calculation
-int timePassed = std::chrono::duration_cast<std::chrono::milliseconds>(chronoNow - chronoPrev).count();
-float fps = 1000 / (float)timePassed;
-timePassedAll.push_back(timePassed);
-fpsAll.push_back(fps);
-//cout << "Time passed since last frame" << timePassed << "\n";
-//cout << "Frames per second " << fps << "\n";
-
-if (showCalc)
-imshow("image", image);
-else
-imshow("image", empty);
-
-j++;
-if (j == (i - 1)) {
-break;
-}
-key = waitKey(1);
-}
-
-//Calculate FPS and give a history of time taken for Webcam
-float fpsSum = 0;
-for (int i = 0; i < timePassedAll.size(); i++) {
-//cout << timePassedAll.at(i) << " - " ;
-if (i != 0) {
-fpsSum = fpsSum + fpsAll.at(i);
-}
-}
-//cout << "\n";
-float fpsAverage = fpsSum / (float)(fpsAll.size() - 1);
-cout << "Average FPS: " << fpsAverage << "\n";
-
-QRTest();
-return -1;
-}
-*/
