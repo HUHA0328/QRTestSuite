@@ -545,23 +545,31 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 				success = false;
 		}
 
-		//If tag exists retag
-		tag = findTaginList(qrData);
-		if (tag == tagDataMap.size())
-			tagDataMap.push_back(qrData);
-		//int tag = tagnumber++; //<- usually find next free tag - global variable?
+		if (success) {
+			//If tag exists retag
+			tag = findTaginList(qrData);
+			if (tag == tagDataMap.size())
+				tagDataMap.push_back(qrData);
+			//int tag = tagnumber++; //<- usually find next free tag - global variable?
 
-		//create QRCode Object
-		QRCode newCode(tag);
-		newCode.pos = QRPos;
-		newCode.decode_success = success;
+			//create QRCode Object
+			QRCode newCode(tag);
+			newCode.pos = QRPos;
+			newCode.decode_success = success;
+			newCode.data = qrData; // <-- we need this or always over tag?
 
-		//if (fipImage.size() == 3) //<- only do this if we had all threeFiPs so its sure that pD and pA are right - not sure if this is the best idea anymore.
-		newCode.orientation = cv_getOrientation(pA, pD); 
+			//if (fipImage.size() == 3) //<- only do this if we had all threeFiPs so its sure that pD and pA are right - not sure if this is the best idea anymore.
+			newCode.orientation = cv_getOrientation(pA, pD);
 
-		//here have a list that gets a new entry with the tag indentification pair
+			//here have a list that gets a new entry with the tag indentification pair
 
-		returnCode = newCode;
+			returnCode = newCode;
+		}
+		else {
+			QRCode newCode(0);
+			newCode.pos = QRPos;
+
+		}
 	}
 
 
