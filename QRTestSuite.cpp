@@ -184,9 +184,10 @@ int QRTest()
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/720p-dist-move.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure-HQ.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-leaving.mp4");
-			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-distance.mp4");
+			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-distance.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-movement.mp4");
 		else if (benchmarktype == "jpg")
 			capture.open("C:/Users/Frederik/Desktop/VidTests/720-frame-jpg/image-%05d.jpg");
 		else if (benchmarktype == "png")
@@ -249,11 +250,15 @@ int QRTest()
 		//Image Processing
 		FiPList = cv_FiPdetection(image, FiPList);
 
-		QRList = cv_QRdetection(FiPList, QRList);
-		decoded += QRList.decode_success;
+		//cout << FiPList.size() << endl;
+
+		//grouping 
+
+		//QRList = cv_QRdetection(FiPList, QRList);
+		//decoded += QRList.decode_success;
 
 		
-		int fipAmount = FiPList.size();
+		/*int fipAmount = FiPList.size();
 		fips.push_back(fipAmount);
 		if (fipAmount == 3) {
 			full++;
@@ -269,7 +274,7 @@ int QRTest()
 		}
 		if (fipAmount > 3) {
 			over++;
-		}
+		}*/
 		
 		//Debug Rendering
 		if (showCalc)
@@ -296,13 +301,14 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 									*/
 {
 	vector<FiP> fipList;
-	vector<vector<Point> > contours;
+	vector<vector<Point> > contours, contoursMorph;
 	vector<vector<Point> > fiPReg;
-	vector<Vec4i> hierarchy;
+	vector<Vec4i> hierarchy, hierarchyMorph;
 	vector<Point> pointsseq;    //used to save the approximated sides of each contour
 	vector<vector<Point> > finderPatterns;
 	vector<vector<Point> > finderCandidate;
 	vector<bool> updated;
+	Mat morphImage;
 	updated.clear();
 
 	cvtColor(inputImage, inputImage, CV_RGB2GRAY);										// Convert Image captured from Image Input to GrayScale	
@@ -312,21 +318,51 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	//resize(inputImage, inputImage, Size(640, 360));
 	threshold(inputImage, inputImage, 180, 255, THRESH_BINARY);							//<- Probably some kind of local threshold better in the Areas of Interest 
 	//imshow("debug", inputImage);
+	morphologyEx(inputImage, morphImage, MORPH_OPEN, getStructuringElement(MORPH_RECT, Size(5,5)), Point(-1,-1), 6); // these behave oppsoite to what to expect since white is obviosly value even if for this purpose it signals that there is nothing
+	morphologyEx(morphImage, morphImage, MORPH_CLOSE, getStructuringElement(MORPH_RECT, Size(3, 3)), Point(-1, -1), 3);
 	resize(inputImage, inputImage, Size(inputImage.size().width * 2, inputImage.size().height * 2));
+	resize(morphImage, morphImage, Size(morphImage.size().width * 2, morphImage.size().height * 2));
+	copyMakeBorder(morphImage, morphImage, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255)); //<---- YES! But adjust for padding
+	copyMakeBorder(image, image, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255)); //<---- for testing
+
+	imshow("morph", morphImage);
 	//resize(inputImage, inputImage, Size(1920, 1080));
 
 	//imshow("debug", inputImage);
+	//imshow("morph", morphImage);
 
+
+
+	
 	Canny(inputImage, inputImage, 80, 150, 3);											// Apply Canny edge detection on the gray image
 	findContours(inputImage, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
-	//imshow("debugContours", inputImage);
+	Canny(morphImage, morphImage, 80, 150, 3);											// Apply Canny edge detection on the gray image
+	findContours(morphImage, contoursMorph, hierarchyMorph, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
+	//imshow("debugContours", morphImage);
+	//cout << "before " << contours.size() << endl;
+	//cout << "after " << contoursMorph.size() << endl;
+	//cout << ((float)contoursMorph.size() / (float)contours.size()) * 100 << "%" << endl;
+	//cout << endl;
+	for (int i = 0; i < contoursMorph.size(); i++) {
+		approxPolyDP(contoursMorph[i], pointsseq, arcLength(contoursMorph[i], true)*0.05, true);
+		if (pointsseq.size() == 4 && isContourConvex(pointsseq)) {
+			drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 0, 255), 2, 8);
+			imshow("image", image);
+		}
+	}
 
+
+	/*
 	for (int i = 0; i < contours.size(); i++)
 	{
 		//Find the approximated polygon of the contour we are examining
-		approxPolyDP(contours[i], pointsseq, arcLength(contours[i], true)*0.02, true); // <- this somehow doesnt work
+		approxPolyDP(contours[i], pointsseq, arcLength(contours[i], true)*0.05, true); // <- this somehow doesnt work
+		//drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(255, 0, 0), 10, 8);
 		if (pointsseq.size() == 4)      // only quadrilaterals contours are examined // <- this neither or I misunderstand it
 		{
+			if (isContourConvex(pointsseq)) {
+				drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 255, 0), 10, 8);
+			}
 			int k = i;
 			int c = 0;
 
@@ -340,16 +376,16 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 			/*if (hierarchy[k][2] != -1)
 			cout << "WARNING";
-			c = c + 1;*/
+			c = c + 1;
 
-			if (c >= 5)
+			if (c >= 4)
 			{
 				finderPatterns.push_back(contours[k]);
 				/*
 				if (mark == 0)		A = i;
 				else if (mark == 1)	B = i;		// i.e., A is already found, assign current contour to B
 				else if (mark == 2)	C = i;		// i.e., A and B are already found, assign current contour to C
-				mark = mark + 1;*/
+				mark = mark + 1;
 				//cout << "FiP area:  " << contourArea(contours[k]) << "\n";
 
 				//if Center not in ANY FiPreg Add to FiPReg
@@ -387,17 +423,17 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 				//all++;
 
 
-			} */
+			} 
 			else
 				i += c;
 		}
 	}
-
+	*/
 	for (auto &fip : fiPReg) {
 		Point Center = cv_getCentroid(fip);
 		fipList.push_back(FiP(Center, fip));
 	}
-	drawContours(image, fiPReg, -1, Scalar(0, 0, 255), 1, 8);
+	drawContours(image, fiPReg, -1, Scalar(0, 0, 255), 20, 8);
 	return fipList;
 }
 
