@@ -20,8 +20,8 @@ using namespace zbar;
 //#################		Tags
 const bool benchmark = true;
 const String benchmarktype = "stream"; //stream mp4, jpg, png <--- prob useless since no gain
-const bool debug = false;
-const bool showCalc = false;
+const bool debug = true;
+const bool showCalc = true;
 
 //#################		Global Variables
 int64 e1, e2;
@@ -123,6 +123,8 @@ QRCode::QRCode(int ptag) {
 }
 
 int main() {
+	//intitialize QRDataList
+	tagDataMap.push_back("String begin");
 	for (int i = 0; i < 10; i++)
 	{	
 		int out = QRTest();
@@ -168,8 +170,7 @@ int QRTest()
 	int solo = 0, partial = 0, full = 0, over = 0;
 	int frame = 0;
 	int decoded = 0;
-	//intitialize QRDataList
-	tagDataMap.push_back("String begin");
+
 
 	// Creation of Intermediate 'Image' Objects required later
 	Mat empty(Size(100, 100), CV_MAKETYPE(image.depth(), 1));
@@ -183,8 +184,9 @@ int QRTest()
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/720p-dist-move.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure-HQ.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-leaving.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
-			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
+			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-distance.mp4");
 		else if (benchmarktype == "jpg")
 			capture.open("C:/Users/Frederik/Desktop/VidTests/720-frame-jpg/image-%05d.jpg");
 		else if (benchmarktype == "png")
@@ -224,11 +226,11 @@ int QRTest()
 			cout << "Frames per Sec        : " << fps << endl;
 			cout << "-----------Accuracy Metrics-----------" << endl;
 			cout << "Frames solo           : " << ((float)solo / (float)frames) * 100 << "%" << endl;  //one found
-			cout << "Frames partial        : " << ((float)partial / (float)frames) * 100 << "%" <<endl;  //two found
+			cout << "Frames partial        : " << ((float)partial / (float)frames) * 100 << "%" << endl;  //two found
 			cout << "Frames full detection : " << ((float)full / (float)frames) * 100 << "%" << endl; //Three FiPs corrected or Reconstructed
 			cout << "Frames overshoot      : " << over << endl;
 			cout << "--------------QR decoded--------------" << endl;
-			cout << "QRCode identified     : " << ((float)decoded / (float)frames) * 100 << endl;
+			cout << "QRCode identified     : " << ((float)decoded / (float)frames) * 100 << "%" << endl;
 			cout << "tags given out        : " << tagDataMap.size() << endl;
 			for (int zi = 0; zi < tagDataMap.size(); zi++)
 				cout << tagDataMap.at(zi) << endl;
@@ -446,6 +448,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, QRCode qrPrevImage) {
 			fip_A = fipImage[0];
 			fip_B = fipImage[1];
 			QRPos = cv_find2FipPos(fip_A, fip_B, qrPrevImage);
+			//found = true;
 		}
 	}
 	else if (fipImage.size() == 1) {
