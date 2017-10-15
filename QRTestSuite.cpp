@@ -53,6 +53,7 @@ int cv_HarrisCorner(Mat img);
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered);
 
 //#################		Support Methods
+Rect cv_getRect(Point p1, Point p2, Point p3, Point p4);
 int findTaginList(String inputData);
 int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos);
 Point cv_getOuterCorner(FiP fip, Point center);
@@ -323,9 +324,10 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	resize(inputImage, inputImage, Size(inputImage.size().width * 2, inputImage.size().height * 2));
 	resize(morphImage, morphImage, Size(morphImage.size().width * 2, morphImage.size().height * 2));
 	copyMakeBorder(morphImage, morphImage, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255)); //<---- YES! But adjust for padding
+	copyMakeBorder(inputImage, inputImage, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255)); //<---- for testing
 	copyMakeBorder(image, image, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255)); //<---- for testing
 
-	imshow("morph", morphImage);
+	//imshow("morph", morphImage);
 	//resize(inputImage, inputImage, Size(1920, 1080));
 
 	//imshow("debug", inputImage);
@@ -346,8 +348,11 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	for (int i = 0; i < contoursMorph.size(); i++) {
 		approxPolyDP(contoursMorph[i], pointsseq, arcLength(contoursMorph[i], true)*0.05, true);
 		if (pointsseq.size() == 4 && isContourConvex(pointsseq)) {
-			drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 0, 255), 2, 8);
-			imshow("image", image);
+			//drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 0, 255), 2, 8);
+			Rect regionOfInterest = cv_getRect(pointsseq[0], pointsseq[1], pointsseq[2], pointsseq[3]);
+			Mat image_roi = image(regionOfInterest);
+			imshow("image", image_roi);
+			waitKey(0);
 		}
 	}
 
@@ -365,7 +370,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 			}
 			int k = i;
 			int c = 0;
-
+			
 			while (hierarchy[k][2] != -1)
 			{
 				//cout << "RUNS :  " << testo << "\n";
@@ -917,6 +922,18 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 //###############################################################################
 //General Support Functions 
 //###############################################################################
+Rect cv_getRect(Point p1, Point p2, Point p3, Point p4) {
+	int minX, minY, maxX, maxY;
+	
+	minX = min({ p1.x, p2.x, p3.x, p4.x });
+	maxX = max({ p1.x, p2.x, p3.x, p4.x });
+	minY = min({ p1.y, p2.y, p3.y, p4.y });
+	maxY = max({ p1.y, p2.y, p3.y, p4.y });
+	
+	Rect newRect(Point(minX, minY), Point(maxX, maxY));
+	return newRect;
+}
+
 int findTaginList(String inputData) { //finds the tag if the QR code was already saved else gives out the next free tag 
 	int tag = 0;
 
