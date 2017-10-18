@@ -53,7 +53,7 @@ int cv_HarrisCorner(Mat img);
 vector<FiP> cv_getFiPOrder(vector<FiP> unordered);
 
 //#################		Support Methods
-Rect cv_getRect(Point p1, Point p2, Point p3, Point p4);
+Rect cv_getRect(Point p1, Point p2, Point p3, Point p4, bool pad);
 int findTaginList(String inputData);
 int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos);
 Point cv_getOuterCorner(FiP fip, Point center);
@@ -336,8 +336,8 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 
 	
-	Canny(inputImage, inputImage, 80, 150, 3);											// Apply Canny edge detection on the gray image
-	findContours(inputImage, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
+	//Canny(inputImage, inputImage, 80, 150, 3);											// Apply Canny edge detection on the gray image
+	//findContours(inputImage, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
 	Canny(morphImage, morphImage, 80, 150, 3);											// Apply Canny edge detection on the gray image
 	findContours(morphImage, contoursMorph, hierarchyMorph, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
 	//imshow("debugContours", morphImage);
@@ -345,14 +345,27 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	//cout << "after " << contoursMorph.size() << endl;
 	//cout << ((float)contoursMorph.size() / (float)contours.size()) * 100 << "%" << endl;
 	//cout << endl;
-	for (int i = 0; i < contoursMorph.size(); i++) {
+	vector<Mat> image_roi;
+	int j = 0;
+	for (int i = 0; i < contoursMorph.size(); i+=2) {
 		approxPolyDP(contoursMorph[i], pointsseq, arcLength(contoursMorph[i], true)*0.05, true);
 		if (pointsseq.size() == 4 && isContourConvex(pointsseq)) {
 			//drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 0, 255), 2, 8);
-			Rect regionOfInterest = cv_getRect(pointsseq[0], pointsseq[1], pointsseq[2], pointsseq[3]);
-			Mat image_roi = image(regionOfInterest);
-			imshow("image", image_roi);
-			waitKey(0);
+			Rect regionOfInterest = cv_getRect(pointsseq[0], pointsseq[1], pointsseq[2], pointsseq[3], true);
+			image_roi.push_back(image(regionOfInterest));
+			//imshow("image", image_roi[j]);
+			cvtColor(image_roi[j], image_roi[j], CV_RGB2GRAY);
+			threshold(image_roi[j], image_roi[j], 180, 255, THRESH_BINARY);
+			copyMakeBorder(image_roi[j], image_roi[j], 5, 5, 5, 5, BORDER_CONSTANT, Scalar(255, 255, 255));
+			resize(image_roi[j], image_roi[j], Size(image_roi[j].size().width*2, image_roi[j].size().height * 2));
+			Canny(image_roi[j], image_roi[j], 10, 200, 3);// 80, 150, 3);
+			//findContours(image_roi[j], contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
+			//imshow("CannyImage", image_roi[j]);
+			//imshow("image", image(regionOfInterest));
+			//waitKey(0);
+			//cvDestroyWindow("CannyImage");
+			//cvDestroyWindow("image");
+			j++;
 		}
 	}
 
@@ -922,15 +935,21 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 //###############################################################################
 //General Support Functions 
 //###############################################################################
-Rect cv_getRect(Point p1, Point p2, Point p3, Point p4) {
+Rect cv_getRect(Point p1, Point p2, Point p3, Point p4, bool pad = false) {
 	int minX, minY, maxX, maxY;
 	
 	minX = min({ p1.x, p2.x, p3.x, p4.x });
 	maxX = max({ p1.x, p2.x, p3.x, p4.x });
 	minY = min({ p1.y, p2.y, p3.y, p4.y });
 	maxY = max({ p1.y, p2.y, p3.y, p4.y });
-	
-	Rect newRect(Point(minX, minY), Point(maxX, maxY));
+	if (pad == true) {
+		minX = (int)minX*0.95;
+		maxX = (int)maxX*1.05;
+		minY = (int)minY*0.95;
+		maxY = (int)maxY*1.05;
+	}
+
+	Rect newRect(Point(minX, minY), Point(min(maxX, image.size().width), min(maxY, image.size().height)));
 	return newRect;
 }
 
