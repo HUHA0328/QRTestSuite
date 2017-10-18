@@ -312,15 +312,16 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	Mat morphImage;
 	updated.clear();
 
-	cvtColor(inputImage, inputImage, CV_RGB2GRAY);										// Convert Image captured from Image Input to GrayScale	
-
 	
+
+	//cout << "test" << endl;
+	cvtColor(inputImage, inputImage, CV_RGB2GRAY);										// Convert Image captured from Image Input to GrayScale
 	resize(inputImage, inputImage, Size(inputImage.size().width / 2, inputImage.size().height / 2));
 	//resize(inputImage, inputImage, Size(640, 360));
 	threshold(inputImage, inputImage, 180, 255, THRESH_BINARY);							//<- Probably some kind of local threshold better in the Areas of Interest 
 	//imshow("debug", inputImage);
-	morphologyEx(inputImage, morphImage, MORPH_OPEN, getStructuringElement(MORPH_RECT, Size(5,5)), Point(-1,-1), 6); // these behave oppsoite to what to expect since white is obviosly value even if for this purpose it signals that there is nothing
-	morphologyEx(morphImage, morphImage, MORPH_CLOSE, getStructuringElement(MORPH_RECT, Size(3, 3)), Point(-1, -1), 3);
+	morphologyEx(inputImage, morphImage, MORPH_OPEN, getStructuringElement(MORPH_RECT, Size(6, 6)), Point(-1,-1), 3); // these behave oppsoite to what to expect since white is obviosly value even if for this purpose it signals that there is nothing
+	morphologyEx(morphImage, morphImage, MORPH_CLOSE, getStructuringElement(MORPH_RECT, Size(5, 5)), Point(-1, -1), 3);
 	resize(inputImage, inputImage, Size(inputImage.size().width * 2, inputImage.size().height * 2));
 	resize(morphImage, morphImage, Size(morphImage.size().width * 2, morphImage.size().height * 2));
 	copyMakeBorder(morphImage, morphImage, 10, 10, 10, 10, BORDER_CONSTANT, Scalar(255, 255, 255)); //<---- YES! But adjust for padding
@@ -329,7 +330,7 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 
 	//imshow("morph", morphImage);
 	//resize(inputImage, inputImage, Size(1920, 1080));
-
+	//waitKey(0);
 	//imshow("debug", inputImage);
 	//imshow("morph", morphImage);
 
@@ -347,106 +348,60 @@ vector<FiP> cv_FiPdetection(Mat inputImage, vector<FiP> prevImage) /*
 	//cout << endl;
 	vector<Mat> image_roi;
 	int j = 0;
-	for (int i = 0; i < contoursMorph.size(); i+=2) {
+	for (int i = 0; i < contoursMorph.size(); i += 2) {
 		approxPolyDP(contoursMorph[i], pointsseq, arcLength(contoursMorph[i], true)*0.05, true);
 		if (pointsseq.size() == 4 && isContourConvex(pointsseq)) {
-			//drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 0, 255), 2, 8);
+
 			Rect regionOfInterest = cv_getRect(pointsseq[0], pointsseq[1], pointsseq[2], pointsseq[3], true);
 			image_roi.push_back(image(regionOfInterest));
 			//imshow("image", image_roi[j]);
 			cvtColor(image_roi[j], image_roi[j], CV_RGB2GRAY);
 			threshold(image_roi[j], image_roi[j], 180, 255, THRESH_BINARY);
 			copyMakeBorder(image_roi[j], image_roi[j], 5, 5, 5, 5, BORDER_CONSTANT, Scalar(255, 255, 255));
-			resize(image_roi[j], image_roi[j], Size(image_roi[j].size().width*2, image_roi[j].size().height * 2));
+			resize(image_roi[j], image_roi[j], Size(image_roi[j].size().width * 2, image_roi[j].size().height * 2));
 			Canny(image_roi[j], image_roi[j], 10, 200, 3);// 80, 150, 3);
-			//findContours(image_roi[j], contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
+			findContours(image_roi[j], contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_KCOS);
 			//imshow("CannyImage", image_roi[j]);
 			//imshow("image", image(regionOfInterest));
 			//waitKey(0);
 			//cvDestroyWindow("CannyImage");
 			//cvDestroyWindow("image");
 			j++;
-		}
-	}
+			//drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 0, 255), 2, 8);
 
-
-	/*
-	for (int i = 0; i < contours.size(); i++)
-	{
-		//Find the approximated polygon of the contour we are examining
-		approxPolyDP(contours[i], pointsseq, arcLength(contours[i], true)*0.05, true); // <- this somehow doesnt work
-		//drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(255, 0, 0), 10, 8);
-		if (pointsseq.size() == 4)      // only quadrilaterals contours are examined // <- this neither or I misunderstand it
-		{
-			if (isContourConvex(pointsseq)) {
-				drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 255, 0), 10, 8);
-			}
-			int k = i;
-			int c = 0;
-			
-			while (hierarchy[k][2] != -1)
+			for (int i = 0; i < contours.size(); i++)
 			{
-				//cout << "RUNS :  " << testo << "\n";
-				k = hierarchy[k][2];
-				c = c + 1;
-				//testo++;
-			}
+				//Find the approximated polygon of the contour we are examining
+				approxPolyDP(contours[i], pointsseq, arcLength(contours[i], true)*0.02, true); // <- this somehow doesnt work
+				if (pointsseq.size() == 4)      // only quadrilaterals contours are examined // <- this neither or I misunderstand it
+				{
+					int k = i;
+					int c = 0;
 
-			/*if (hierarchy[k][2] != -1)
-			cout << "WARNING";
-			c = c + 1;
-
-			if (c >= 4)
-			{
-				finderPatterns.push_back(contours[k]);
-				/*
-				if (mark == 0)		A = i;
-				else if (mark == 1)	B = i;		// i.e., A is already found, assign current contour to B
-				else if (mark == 2)	C = i;		// i.e., A and B are already found, assign current contour to C
-				mark = mark + 1;
-				//cout << "FiP area:  " << contourArea(contours[k]) << "\n";
-
-				//if Center not in ANY FiPreg Add to FiPReg
-				//if (!cv_inFiPReg(fiPReg, cv_getCentroid(contours[k - c]))) { // <-- will try to do the update in here? or change it do give back the index of the fitting rectangle for later use
-				// What if more Points are included in a region or a Point in more then one? second shouldn't really happen 
-				// the first part is only for the Candidates
-				vector<Point> fipSquare;
-				approxPolyDP(contours[k - c], fipSquare, arcLength(contours[i], true)*0.02, true);
-				//if (!cv_inFiPRegTesting(fiPReg, fipSquare, updated)) {
-					fiPReg.push_back(fipSquare);
-					//updated[updated.size() - 1].flip();// = true;
-				//	updated.push_back(true);
-					//cout << fiPReg.size() << "\n";
-				//}
-
-
-
-				//if Center in a FiPReg //TODO: decide if marked as found or put a connection so that possible multiples can be detected but that shouldnt happen so how would the problem be solved?
-			} /*else if (c = 4) { // there was an = all the time???
-				approxPolyDP(contours[k], pointsseq, arcLength(contours[i], true)*0.02, true);
-				if (pointsseq.size() == 4) {
-					if (isContourConvex(pointsseq)) {
-						if (contourArea(contours[k]) > 10) { //TODO: check how expensive and finetune value? find less magic number
-							finderCandidate.push_back(contours[k]);
-							//cout << "Candidate area:  " << contourArea(contours[k]) << "\n";
-							if (showCalc == true) {
-								drawContours(image, vector<vector<Point> >(1, pointsseq), -1, Scalar(0, 255, 0), 1, 8);
-							}
-							//size++;
-						}
-						//convex++;
+					while (hierarchy[k][2] != -1)
+					{
+						k = hierarchy[k][2];
+						c = c + 1;
 					}
-					//points++;
+
+					if (c >= 4)
+					{
+						finderPatterns.push_back(contours[k]);
+						vector<Point> fipSquare;
+						approxPolyDP(contours[k - c], fipSquare, arcLength(contours[i], true)*0.02, true);
+						fiPReg.push_back(fipSquare);
+					} 
+					else
+						i += c;
 				}
-				//all++;
-
-
-			} 
-			else
-				i += c;
+			}
 		}
 	}
-	*/
+	
+
+	
+	
+	
 	for (auto &fip : fiPReg) {
 		Point Center = cv_getCentroid(fip);
 		fipList.push_back(FiP(Center, fip));
