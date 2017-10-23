@@ -459,20 +459,6 @@ QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 	// if 3 or 2 diagonal we already have the position
 	//cout << fipImage.size() << endl;
 
-	//DEBUG DRAWING 
-	/*if (fipImage.size() == 2) {
-		Mat img2 = image;
-		for (auto &fip : fipImage) {
-			drawContours(img2, vector<vector<Point> >(1, fip.shape), -1, Scalar(0, 0, 255), 1, 8);
-		}
-		imshow("image", img2);
-		int key = 0;
-		key = waitKey(0);
-		if (key == 'd') {
-			cout << "wait" << endl;
-		}
-	}*/
-
 	if (fipImage.size() == 3) {
 		if (fipImage[0].relPos == 0) {
 			QRPos = (fipImage[1].pos + fipImage[2].pos)*.5;
@@ -488,9 +474,9 @@ QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 		}
 		else if (fipImage[2].relPos == 0) {
 			QRPos = (fipImage[0].pos + fipImage[1].pos)*.5;
-			fip_A = fipImage[1];
-			fip_B = fipImage[2];
-			fip_C = fipImage[0];
+			fip_A = fipImage[2]; //2 //vorher 1
+			fip_B = fipImage[1]; //1 //2
+			fip_C = fipImage[0]; //0 //0
 		}
 		found = true;
 	}
@@ -648,6 +634,7 @@ QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 				else
 					success = false;
 
+				/*
 				if (qrData == "ERROR") {
 					// FOR DEBUG DRAWINGS
 					drawContours(image, vector<vector<Point> >(1, qrImg2), -1, Scalar(0, 0, 255), 1, 8);
@@ -657,9 +644,16 @@ QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 					circle(image, qrImg2[3], 4, Scalar(255, 255, 255), -1, 8, 0);
 					imshow("QR code old", qr_thres);
 					imshow("image", image);
-					waitKey(0);
+					int key = 0;
+					key = waitKey(0);
+					if (key == 'd') {
+						cout << "wait" << endl;
+						cv_QRdetection(fipImage, qrPrevImage);
+					}
 					//#####################
-				}
+					//DEBUG DRAWING 
+
+				}*/
 			}
 
 			if (success) {
@@ -967,7 +961,7 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 	}
 	// if two fips exist we can check if they are on the Diagonal and thus B and C or not and thus A and ?
 	if (unordered.size() == 2) {
-		//get the conecting side
+		//get the connecting side
 		float side1 = cv_euclideanDist(unordered[0].pos, unordered[1].pos);
 		//check if diagonal or orthogonal
 		float angle = cv_lineLineAngle(unordered[0].shape[0], unordered[0].shape[1], unordered[0].pos, unordered[1].pos);
