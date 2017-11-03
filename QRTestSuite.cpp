@@ -187,8 +187,8 @@ int QRTest()
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-leaving.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
 			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
-			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-distance.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-movement.mp4");
+			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-distance.mp4");
+			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-movement.mp4");
 		else if (benchmarktype == "jpg")
 			capture.open("C:/Users/Frederik/Desktop/VidTests/720-frame-jpg/image-%05d.jpg");
 		else if (benchmarktype == "png")
@@ -427,7 +427,7 @@ vector<vector<FiP>> cv_FiPdetection(Mat inputImage, vector<vector<FiP>> prevImag
 			groupCol = Scalar(255, 0, 0);
 		else if (z == 1) {
 			groupCol = Scalar(0, 255, 0);
-			waitKey(0);
+			//waitKey(0);
 		}
 		else if (z == 2)
 			groupCol = Scalar(255, 255, 0);
@@ -628,11 +628,13 @@ QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 				threshold(qr_gray, qr_thres, 180, 255, CV_THRESH_BINARY); //and this
 
 				qrData = decode(qr_thres);
-				cout << qrData << endl;
+				
 				if (qrData != "ERROR")
 					success = true;
-				else
+				else {
 					success = false;
+					cout << qrData << endl;
+				}
 
 				/*
 				if (qrData == "ERROR") {
