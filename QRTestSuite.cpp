@@ -7,7 +7,61 @@
 //###############################################################################
 //Methods
 //###############################################################################
-class FiP {
+QRFinder::QRFinder(int inputCameraImageWidth,
+	int inputCameraImageHeight,
+	const cv::Mat_<double>& inputCameraCalibrationMatrix,
+	const cv::Mat_<double>& inputCameraDistortionParameters,
+	bool pShowResults) 
+{
+
+
+	// Check inputs
+	if (inputCameraImageWidth <= 0 || inputCameraImageHeight <= 0) {
+		std::cerr << "Camera image dimensions invalid!" << std::endl;
+	}
+
+	// Check camera calibration matrix dimensions
+	if (inputCameraCalibrationMatrix.dims != 2) {
+		std::cerr << "Camera calibration matrix is not 3x3!" << std::endl;
+	}
+
+	for (int i = 0; i < inputCameraCalibrationMatrix.dims; i++) {
+		if (inputCameraCalibrationMatrix.size[i] != 3) {
+			std::cerr << "Camera calibration matrix is not 3x3!" << std::endl;
+		}
+	}
+
+	// Check distortion coefficients size
+	if (inputCameraDistortionParameters.dims != 2) {
+		std::cerr << "Distortion coefficents vector is not 5x1!" << std::endl;
+	}
+
+	if (inputCameraDistortionParameters.size[1] != 1 ||
+		inputCameraDistortionParameters.size[0] != 5) {
+		std::cerr << "Distortion coefficents vector is not 5x1!" << std::endl;
+	}
+
+	expectedCameraImageWidth = inputCameraImageWidth;
+	expectedCameraImageHeight = inputCameraImageHeight;
+
+	cameraMatrix = inputCameraCalibrationMatrix;
+	distortionParameters = inputCameraDistortionParameters;
+	showResults = pShowResults;
+
+	// Configure the QR code reader object
+	zbarScanner.set_config(zbar::ZBAR_QRCODE, zbar::ZBAR_CFG_ENABLE, 1);
+	zbarScanner.enable_cache(false);  // Set it so that it will show QR code
+									  // result even if it was in the last frame
+
+									  // Create window to show results, if we are suppose to
+	if (showResults == true) {
+		cv::namedWindow(QRCodeStateEstimatorWindowTitle, CV_WINDOW_AUTOSIZE);
+	}
+};
+
+
+
+class QRFinder::FiP {
 public:
 	FiP ();
 	FiP (int pRelPos);
@@ -21,20 +75,20 @@ public:
 	}
 };
 
-FiP::FiP() {
+QRFinder::FiP::FiP() {
 	
 }
 
-FiP::FiP(int pRelPos) {
+QRFinder::FiP::FiP(int pRelPos) {
 	relPos = pRelPos;
 }
 
-FiP::FiP (Point pPos, vector<Point> pShape) {
+QRFinder::FiP::FiP (Point pPos, vector<Point> pShape) {
 	pos = pPos;
 	shape = pShape;
 }
 
-class QRCode { //Class for the QR-Code that saves all relevant information for one Instance
+class QRFinder::QRCode { //Class for the QR-Code that saves all relevant information for one Instance
 	public:
 		QRCode(int ptag);
 		Point pos; // x and y pos of the middle of the QR-Code (mostly for testing as the Corners will be used for processing)
@@ -49,100 +103,48 @@ class QRCode { //Class for the QR-Code that saves all relevant information for o
 
 };
 
-QRCode::QRCode(int ptag) {
+QRFinder::QRCode::QRCode(int ptag) {
 	tag = ptag;
 }
 
-int main() {
-	//intitialize QRDataList
-	tagDataMap.push_back("String begin");
-	for (int i = 0; i < 10; i++)
-	{	
-		int out = QRTest();
-		if (out == -1) {
-			cerr << "ERR: Manual Abort" << endl;
-			break;
-		}
-		fpsCalc(globalFPS);
-	}
-	cout << "--------------Complete Run finished--------------" << endl;
-	cout << "Average FPS: " << avgFPS << endl;
-	cout << "Highes FPS: " << highFPS << endl;
-	cout << "Lowest FPS: " << lowFPS << endl;
-	waitKey(0);
-}
-
-int fpsCalc(float fps) {
-	float sumFPS = 0.0;
-	allFPS.push_back(fps);
-
-	for (int i = 0; i < allFPS.size(); i++)
-		sumFPS += allFPS.at(i);
-	avgFPS = sumFPS / allFPS.size();
-
-	if (fps > highFPS)
-		highFPS = fps;
-	else if (fps < lowFPS)
-		lowFPS = fps;
-
-	return 0;
-}
-
-int QRTest()
+int QRFinder::QRBenchmark(bool showCalc)
 {
-	e1 = getTickCount();
-	cout << "--------------Test Start--------------" << endl;
-	//Variable Initializations
-	int key = 0; //input key of the hughgui classbb
-	VideoCapture capture;//("C:/Users/Frederik/Desktop/VidTests/720-frame-jpg/image-%05d.jpg");
+
+	int64 e1, e2;
+	float t;
+	float globalFPS = 0.0;
 	vector<int> timePassedAll;
 	vector<vector<FiP>> FiPList;
 	vector<QRCode> QRList;
-	int solo = 0, partial = 0, full = 0, over = 0;
-	int frame = 0;
-	int decoded = 0;
 
+	//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure.mp4");
+	//capture.open("C:/Users/Frederik/Desktop/VidTests/720p-dist-move.mp4");
+	//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure-HQ.mp4");
+	//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-leaving.mp4");
+	//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
+	//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
+	//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-distance.mp4");
+	VideoCapture capture;
+	capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-movement.mp4");
 
 	// Creation of Intermediate 'Image' Objects required later
 	Mat empty(Size(100, 100), CV_MAKETYPE(image.depth(), 1));
-
-	if (benchmark == false) {
-		capture.open(0);
-	}
-	else {
-		if (benchmarktype == "stream")
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/720p-dist-move.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/long-exposure-HQ.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-leaving.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-short-easy.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/single-long-all.mp4");
-			//capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-distance.mp4");
-			capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-movement.mp4");
-		else if (benchmarktype == "jpg")
-			capture.open("C:/Users/Frederik/Desktop/VidTests/720-frame-jpg/image-%05d.jpg");
-		else if (benchmarktype == "png")
-			capture.open("C:/Users/Frederik/Desktop/VidTests/2FiPTestMulti.png");
-	}
 
 	if (!capture.isOpened()) {
 		cerr << " ERR: Unable find input Video source." << endl;
 		return -1;
 	}
 
-	while (key != 'q' && capture.isOpened()) //Main Computation Loop
-	{
-		frame++; 
+	Mat empty(Size(100, 100), CV_MAKETYPE(image.depth(), 1));
+	e1 = getTickCount();
 
-		//Pause for Observing Output - This will disrupt the timing
-		if (key == 'p') {
-			key = waitKey(0);
-		}
+	while (capture.isOpened()) //Main Computation Loop
+	{
 
 		capture >> image;
 
 		if (image.empty()) { // If there is no more pictures in the benchmark the loop will break;
-			//Benchmark  Time
+							 //Benchmark  Time
 			e2 = getTickCount();
 			t = (e2 - e1) / getTickFrequency();
 			int frames = capture.get(CAP_PROP_FRAME_COUNT);
@@ -156,34 +158,24 @@ int QRTest()
 			cout << "-------------Time Metrics-------------" << endl;
 			cout << "Time Passed           : " << t << endl;
 			cout << "Frames per Sec        : " << fps << endl;
-			cout << "-----------Accuracy Metrics-----------" << endl;
+			/*cout << "-----------Accuracy Metrics-----------" << endl;
 			cout << "Frames solo           : " << ((float)solo / (float)frames) * 100 << "%" << endl;  //one found
 			cout << "Frames partial        : " << ((float)partial / (float)frames) * 100 << "%" << endl;  //two found
 			cout << "Frames full detection : " << ((float)full / (float)frames) * 100 << "%" << endl; //Three FiPs corrected or Reconstructed
 			cout << "Frames overshoot      : " << over << endl;
 			cout << "--------------QR decoded--------------" << endl;
 			cout << "QRCode identified     : " << ((float)decoded / (float)frames) * 100 << "%" << endl;
-			cout << "tags given out        : " << tagDataMap.size() << endl;
-			for (int zi = 0; zi < tagDataMap.size(); zi++)
-				cout << tagDataMap.at(zi) << endl;
-			//precicion?? <- we need ground truth
-			//QR Codes?? <- For multiple
-			//somehow measure how correct the guesses were ~ similar to precicion? 
+			cout << "tags given out        : " << tagDataMap.size() << endl;*/
 
 			return 0;
 		}
 
-		//Reset of Variables
-		//vector<vector<Point> > finderPatterns;
-		//vector<vector<Point> > finderCandidate;
-		
-		
 		//Image Processing
 		FiPList = cv_FiPdetection(image, FiPList); //<--- the QR list should go there
 
-		//cout << FiPList.size() << endl;
+												   //cout << FiPList.size() << endl;
 
-		//grouping 
+												   //grouping 
 
 		for (auto &fip : FiPList) {
 			QRCode qrNew = cv_QRdetection(fip, QRList);
@@ -195,28 +187,8 @@ int QRTest()
 					}
 				}
 				QRList.push_back(qrNew);
-			} 
+			}
 		}
-		//decoded += QRList.decode_success;
-
-		
-		/*int fipAmount = FiPList.size();
-		fips.push_back(fipAmount);
-		if (fipAmount == 3) {
-			full++;
-			partial++;
-			solo++;
-		}
-		else if (fipAmount == 2) {
-			partial++;
-			solo++;
-		}
-		else if (fipAmount == 1) {
-			solo++;
-		}
-		if (fipAmount > 3) {
-			over++;
-		}*/
 		
 		//Debug Rendering
 		if (showCalc)
@@ -224,18 +196,41 @@ int QRTest()
 		else
 			imshow("image", empty);
 
-		key = waitKey(1);	// OPENCV: wait for 1ms before accessing next frame
-	} //End of Main Computation Loop
-	if (key == 'q')
-		return -1;
-	else
-		return 0;
+		waitKey(1);
+	}
+}
+
+int QRFinder::QRScan(vector<vector<FiP>> FiPList, vector<QRCode> QRList,
+	const cv::Mat& inputGrayscaleFrame,
+	cv::Mat& inputCameraPoseBuffer,
+	std::string& inputQRCodeIdentifierBuffer,
+	double& inputQRCodeDimensionBuffer)
+{
+	FiPList = cv_FiPdetection(image, FiPList); //<--- the QR list should go there
+
+											   //cout << FiPList.size() << endl;
+
+											   //grouping 
+
+	for (auto &fip : FiPList) {
+		QRCode qrNew = cv_QRdetection(fip, QRList);
+		if (qrNew.tag != 0) {
+			for (int i = 0; i < QRList.size(); i++) { //<- It should also be possible to optimize this but since we technicly should never get more than exsisting QR codes (so around 3) entrys it should always run very fast
+				if (QRList[i].tag == qrNew.tag) {
+					QRList.erase(QRList.begin() + i);
+					break;
+				}
+			}
+			QRList.push_back(qrNew);
+		}
+	}
+	
 }
 
 /* calling a method an reinitializing a lot of Variables should create a overhead compared to just use one method?
 	Maybe I should do a speed test since it would be far easier to understand in more methods but if it costs more time
 	nothing is really gained*/
-vector<vector<FiP>> cv_FiPdetection(Mat inputImage, vector<vector<FiP>> prevImage ) /* //<--- the QR list should go there
+vector<vector<QRFinder::FiP>> QRFinder::cv_FiPdetection(Mat inputImage, vector<vector<FiP>> prevImage ) /* //<--- the QR list should go there
 									input:
 
 									output:
@@ -374,7 +369,7 @@ vector<vector<FiP>> cv_FiPdetection(Mat inputImage, vector<vector<FiP>> prevImag
 	return fipList;
 }
 
-QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
+QRFinder::QRCode QRFinder::cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 	QRCode returnCode(0);
 	Point QRPos;
 	FiP fip_A, fip_B, fip_C;
@@ -563,29 +558,8 @@ QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 					success = true;
 				else {
 					success = false;
-					cout << qrData << endl;
 				}
 
-				/*
-				if (qrData == "ERROR") {
-					// FOR DEBUG DRAWINGS
-					drawContours(image, vector<vector<Point> >(1, qrImg2), -1, Scalar(0, 0, 255), 1, 8);
-					circle(image, qrImg2[0], 10, Scalar(0, 255, 0), -1, 8, 0);
-					circle(image, qrImg2[1], 8, Scalar(255, 255, 0), -1, 8, 0);
-					circle(image, qrImg2[2], 6, Scalar(0, 255, 255), -1, 8, 0);
-					circle(image, qrImg2[3], 4, Scalar(255, 255, 255), -1, 8, 0);
-					imshow("QR code old", qr_thres);
-					imshow("image", image);
-					int key = 0;
-					key = waitKey(0);
-					if (key == 'd') {
-						cout << "wait" << endl;
-						cv_QRdetection(fipImage, qrPrevImage);
-					}
-					//#####################
-					//DEBUG DRAWING 
-
-				}*/
 			}
 
 			if (success) {
@@ -620,36 +594,18 @@ QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrPrevImage) {
 
 	//cout << "THIS WILL NEVER BE REACHED" << endl;
 	// DEBUG CENTER POINT
-	if (debug == true) {
+	if (showResults == true) {
 		circle(image, QRPos, 10, Scalar(0, 0, 255), -1, 8, 0);
-		/*if (found) {
-			try {
-				float dist = cv_vectorSize(prevPos - QRPos);
-				if (dist>=150.0)
-					cout << dist << endl;
-			}
-			catch (const std::exception&) {}
-
-			prevPos = QRPos;
-		}*/
 	}
 
 	return returnCode;
 }
 
-//Horrible Performance
-int cv_HarrisCorner(Mat img) {
 
-	cvtColor(img, img, CV_RGB2GRAY);
-	cornerHarris(img, img, 2, 3, 0.05);
-	imshow("Harris", img);
-
-	return 0;
-}
 //###############################################################################
 //Decodation Support Function
 //###############################################################################
-String decode(Mat inputImage) {
+String QRFinder::decode(Mat inputImage) {
 	ImageScanner scanner;
 	scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
 	bool found = false;
@@ -681,11 +637,37 @@ String decode(Mat inputImage) {
 		return "ERROR";
 }
 
+String QRFinder::decodeMobile(Mat inputImage) {
+	bool found = false;
+	String output;
+	Mat imgout;
+
+	int width = inputImage.cols;
+	int height = inputImage.rows;
+	uchar *raw = (uchar *)inputImage.data;
+	// wrap image data  
+	Image imageFile(width, height, "Y800", raw, width * height);
+	// scan the image for barcodes  
+	int n = zbarScanner.scan(imageFile);
+	// extract results  
+	for (Image::SymbolIterator symbol = imageFile.symbol_begin();
+	symbol != imageFile.symbol_end();
+		++symbol) {
+		output = symbol->get_data();
+		found = true;
+	}
+
+	if (found)
+		return output;
+	else
+		return "ERROR";
+}
+
 
 //###############################################################################
 //Detection Support Functions 
 //###############################################################################
-Point cv_find1FiPPos(FiP fip_A, QRCode qrPrevImage) {
+Point QRFinder::cv_find1FiPPos(QRFinder::FiP fip_A, QRFinder::QRCode qrPrevImage) {
 	String orientation = qrPrevImage.orientation;
 	Point A1 = fip_A.shape[0];
 	Point A2 = fip_A.shape[1];
@@ -699,7 +681,7 @@ Point cv_find1FiPPos(FiP fip_A, QRCode qrPrevImage) {
 	return Point(0, 0); // <-debug
 }
 
-Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
+Point QRFinder::cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
 	Point p_1;
 	Point p_2;
 	bool switched = false;
@@ -753,7 +735,7 @@ Point cv_find2FipPos(FiP fip_A, FiP fip_B, QRCode prevQR) {
 		return p_2;
 }
 
-int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
+int QRFinder::cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 	//gets the two Diagonal fips - bother other cornerPoints will be reconstructed from this
 	//if FiP_A is know the outermost Point should be given in
 	int decrementB = -1;
@@ -823,7 +805,7 @@ int cv_findCorners(Point& pA, FiP fip_B, FiP fip_C, Point& pD, Point QRPos) {
 	return 0;
 }
 
-Point cv_getOuterCorner(FiP fip, Point center) {
+Point QRFinder::cv_getOuterCorner(FiP fip, Point center) {
 	//gets the Point of the fip that makes up the Corner of the QR
 	//should be Point furthest away from center
 	Point outer(0, 0);
@@ -839,7 +821,7 @@ Point cv_getOuterCorner(FiP fip, Point center) {
 	return outer;
 }
 
-Point cv_getOuterCorner(FiP fip, Point center, int& index) {
+Point QRFinder::cv_getOuterCorner(FiP fip, Point center, int& index) {
 	//gets the Point of the fip that makes up the Corner of the QR
 	//should be Point furthest away from center
 	//this also returns the index of the Point in the FiP shape
@@ -858,7 +840,7 @@ Point cv_getOuterCorner(FiP fip, Point center, int& index) {
 }
 
 
-vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order with 0 being A 1 being B 2 being C 
+vector<QRFinder::FiP> QRFinder::cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order with 0 being A 1 being B 2 being C 
 										 //if less then 3 FiP unknown FiPs should get the tag -1 so we can reconstruct them
 	Point peak;
 	Point hyotenuse1, hyotenuse2;
@@ -923,7 +905,7 @@ vector<FiP> cv_getFiPOrder(vector<FiP> unordered){ //Returns the FiPs in order w
 //###############################################################################
 //General Support Functions 
 //###############################################################################
-Rect cv_getRect(Point p1, Point p2, Point p3, Point p4, bool pad = false) {
+Rect QRFinder::cv_getRect(Point p1, Point p2, Point p3, Point p4, bool pad = false) {
 	int minX, minY, maxX, maxY;
 	
 	minX = min({ p1.x, p2.x, p3.x, p4.x });
@@ -941,7 +923,7 @@ Rect cv_getRect(Point p1, Point p2, Point p3, Point p4, bool pad = false) {
 	return newRect;
 }
 
-int findTaginList(String inputData) { //finds the tag if the QR code was already saved else gives out the next free tag 
+int QRFinder::findTaginList(String inputData) { //finds the tag if the QR code was already saved else gives out the next free tag 
 	int tag = 0;
 
 	for (int i = 0; i < tagDataMap.size(); i++) {
@@ -951,7 +933,7 @@ int findTaginList(String inputData) { //finds the tag if the QR code was already
 	return tagDataMap.size();
 }
 
-bool cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& res) {
+bool QRFinder::cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& res) {
 	//Gets the intersectionPoint from 2 lines denoted by a1 a2 and b1 b2
 	Point p = a1;
 	Point q = b1;
@@ -966,29 +948,29 @@ bool cv_getIntersection(Point a1, Point a2, Point b1, Point b2, Point& res) {
 	return true;
 }
 
-float cross(Point2f v1, Point2f v2)
+float QRFinder::cross(Point2f v1, Point2f v2)
 {
 	return v1.x*v2.y - v1.y*v2.x;
 }
 
-bool cv_inRegion(Point center, int radius, Point newPoint) { //gives out true if in the region around the center is the newPoint
+bool QRFinder::cv_inRegion(Point center, int radius, Point newPoint) { //gives out true if in the region around the center is the newPoint
 	if (cv_vectorSize(center- newPoint) <= radius) 
 		return true;
 	else
 		return false;
 }
 
-float cv_lineLineAngle(Point l1_1, Point l1_2, Point l2_1, Point l2_2) { //Gets the angle that is between two lines denoted by their start and end Points
+float QRFinder::cv_lineLineAngle(Point l1_1, Point l1_2, Point l2_1, Point l2_2) { //Gets the angle that is between two lines denoted by their start and end Points
 	// http://mathworld.wolfram.com/Line-LineAngle.html
 	return ((l1_2 - l1_1).dot(l2_2 - l2_1)) / (cv_vectorSize(l1_2 - l1_1)*cv_vectorSize(l2_2 - l2_1));
 }
 
-float cv_vectorSize(Point a) {
+float QRFinder::cv_vectorSize(Point a) {
 	return hypot(a.x, a.y);
 }
 
 
-String cv_getOrientation(Point a, Point b) { //Gets orientation of Point b in relation to a
+String QRFinder::cv_getOrientation(Point a, Point b) { //Gets orientation of Point b in relation to a
 	String orientation;
 
 	if (a.x >= b.x) {
@@ -1011,7 +993,7 @@ String cv_getOrientation(Point a, Point b) { //Gets orientation of Point b in re
 	return orientation;
 }
 
-Point cv_getCentroid(vector<Point> contour) {
+Point QRFinder::cv_getCentroid(vector<Point> contour) {
 	int sumX = 0, sumY = 0;
 	int size = contour.size();
 	Point centroid;
@@ -1028,13 +1010,13 @@ Point cv_getCentroid(vector<Point> contour) {
 	return centroid;
 }
 
-float cv_euclideanDist(Point p, Point q) {
+float QRFinder::cv_euclideanDist(Point p, Point q) {
 	Point diff = p - q;
 	return	hypot(diff.x, diff.y);
 	//cv::sqrt(diff.x*diff.x + diff.y*diff.y);
 }
 
-bool cv_inRect(vector<Point> rectangle, Point p) { //ToDo: need knowledge in which order the Points are... do we have this?
+bool QRFinder::cv_inRect(vector<Point> rectangle, Point p) { //ToDo: need knowledge in which order the Points are... do we have this?
 	int minx, miny, maxx, maxy;
 	if (rectangle.size() > 4) return false;
 	/*for (int i = 0; i < 4; i++) { // show Corner Points
@@ -1055,7 +1037,7 @@ bool cv_inRect(vector<Point> rectangle, Point p) { //ToDo: need knowledge in whi
 }
 
 //For testing checks if Contour Center is in any Contour -- makes it easier to refresh  -- check which should be used later
-bool cv_inFiPRegTesting(vector<vector<Point>>& FiPRegs, vector<Point> Contour, vector<bool>& updated) {
+bool QRFinder::cv_inFiPRegTesting(vector<vector<Point>>& FiPRegs, vector<Point> Contour, vector<bool>& updated) {
 	Point p = cv_getCentroid(Contour);
 	//circle(image, p, 10, Scalar(255, 0, 0), -1, 8, 0);
 	int index = 0;
@@ -1081,7 +1063,7 @@ bool cv_inFiPRegTesting(vector<vector<Point>>& FiPRegs, vector<Point> Contour, v
 }
 
 //Check if ANY of the input contours center point is in the input Contour and returns the index of the first Point that fits // or the point? not sure yet
-int cv_CandidateInRegion(vector<Point> contour, vector<vector<Point> > candidates) {
+int QRFinder::cv_CandidateInRegion(vector<Point> contour, vector<vector<Point> > candidates) {
 	int index = 0; // does it make sense to use a iterator when we need the index anyways? its also applies to the other two functions over this
 	for (std::vector<vector<Point>>::iterator it = candidates.begin(); it != candidates.end(); ++it) {
 		Point p = cv_getCentroid(*it);
