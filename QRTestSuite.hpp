@@ -4,6 +4,8 @@
 #include <iostream>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/videoio.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -57,7 +59,8 @@ public:
 
 	//#################		Main Methods
 	int QRBenchmark(bool showCalc);
-	int QRScan(vector<vector<FiP>> FiPList,
+	int QRScan(
+		vector<vector<FiP>> FiPList,
 		vector<QRCode> QRList,
 		const cv::Mat& inputGrayscaleFrame,
 		cv::Mat& inputCameraPoseBuffer,
@@ -68,6 +71,12 @@ public:
 	vector<vector<FiP>> cv_FiPdetection(Mat inputImage, vector<vector<FiP>> prevImage);
 	QRCode cv_QRdetection(vector<FiP> fipImage, vector<QRCode> qrpPrevImage);
 	vector<FiP> cv_getFiPOrder(vector<FiP> unordered);
+	int CalculatePoseFromQRList(const cv::Mat& inputFrame,
+		vector<QRCode> QRList,
+		std::vector<cv::Mat>& inputCameraPosesBuffer,
+		std::vector<std::string>& inputQRCodeIdentifiersBuffer,
+		std::vector<double>& inputQRCodeDimensionsBuffer);
+	float getQRSizefromString(String qrString);
 
 	//#################		Support Methods
 	Rect cv_getRect(Point p1, Point p2, Point p3, Point p4, bool pad);

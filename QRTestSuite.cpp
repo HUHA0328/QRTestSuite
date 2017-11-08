@@ -94,7 +94,8 @@ class QRFinder::QRCode { //Class for the QR-Code that saves all relevant informa
 		Point pos; // x and y pos of the middle of the QR-Code (mostly for testing as the Corners will be used for processing)
 		int tag; // Tag that will identify this QR-Code so that every QR-data will only have one corresponding QR-Code
 		FiP fip_a, fip_b, fip_c; //The finderpatterns
-		Point a, b, c, d; //the Corner Points
+		//Point a, b, c, d; //the Corner Points
+		vector<Point2f> shape;
 		String orientation; //does it make sense to create a new class for this?
 		bool decode_success; //shows it was successfull decoded
 		String data; //gives the data -> maybe we want to sace this in a table with the tags so a possible parallel process wouldn't have to access the Object everytime
@@ -224,6 +225,9 @@ int QRFinder::QRScan(vector<vector<FiP>> FiPList, vector<QRCode> QRList,
 			QRList.push_back(qrNew);
 		}
 	}
+
+	// We still need to calculate and return the pose here (and the Position of the QR codes <- not sure we need there or if 
+	// they are implied by the Pose Estimation)
 	
 }
 
@@ -518,11 +522,11 @@ QRFinder::QRCode QRFinder::cv_QRdetection(vector<FiP> fipImage, vector<QRCode> q
 			qrImg.push_back(Point2f(cv_getOuterCorner(fip_C, QRPos)));
 
 			//for drawining debug version
-			vector<Point> qrImg2;
+			/*vector<Point> qrImg2;
 			qrImg2.push_back(Point(pA));
 			qrImg2.push_back(Point(cv_getOuterCorner(fip_B, QRPos)));
 			qrImg2.push_back(Point(pD)); //<- order important?
-			qrImg2.push_back(Point(cv_getOuterCorner(fip_C, QRPos)));
+			qrImg2.push_back(Point(cv_getOuterCorner(fip_C, QRPos)));*/
 
 			//For Testing Do different later!
 			Mat qr, qr_raw, qr_gray, qr_gray_sharp, qr_thres;
@@ -574,6 +578,7 @@ QRFinder::QRCode QRFinder::cv_QRdetection(vector<FiP> fipImage, vector<QRCode> q
 				newCode.pos = QRPos;
 				newCode.decode_success = success;
 				newCode.data = qrData; // <-- we need this or always over tag?
+				newCode.shape = qrImg;
 
 				//if (fipImage.size() == 3) //<- only do this if we had all threeFiPs so its sure that pD and pA are right - not sure if this is the best idea anymore.
 				newCode.orientation = cv_getOrientation(pA, pD);
@@ -601,6 +606,91 @@ QRFinder::QRCode QRFinder::cv_QRdetection(vector<FiP> fipImage, vector<QRCode> q
 	return returnCode;
 }
 
+int QRFinder::CalculatePoseFromQRList(
+	const cv::Mat& inputFrame,
+	vector<QRCode> QRList,
+	std::vector<cv::Mat>& inputCameraPosesBuffer,
+	std::vector<std::string>& inputQRCodeIdentifiersBuffer,
+	std::vector<double>& inputQRCodeDimensionsBuffer) {
+
+	// Clear the buffers to store everything in
+	inputCameraPosesBuffer.clear();
+	inputQRCodeIdentifiersBuffer.clear();
+	inputQRCodeDimensionsBuffer.clear();
+
+	//(auto &p : fip.shape)
+	for (auto &qr : QRList) {
+
+		//how to check which is the best QR code for the estimation ? just do all estimations and compare or Average 
+
+		//Just let full QR Codes (three FIPs be eligible?) or be more valuable in some way
+
+		double QRCodeSizeInMeter = 0.20; //where are we going to encode this
+		//QRCodeSizeInMeter = qr.size;
+
+		double buf = QRCodeSizeInMeter / 2.0;
+		std::vector<cv::Point3d> objectVerticesInObjectCoordinates = {
+			cv::Point3d(-buf, -buf, 0), cv::Point3d(buf, -buf, 0),
+			cv::Point3d(buf, buf, 0), cv::Point3d(-buf, buf, 0) };
+
+		// Make buffers to get 3x1 rotation vector and 3x1 translation vector
+		cv::Mat_<double> rotationVector(3, 1);
+		cv::Mat_<double> translationVector(3, 1);
+
+		// Use solvePnP to get the rotation and translation vector of the QR code
+		// relative to the camera
+		cv::solvePnP(objectVerticesInObjectCoordinates, qr.shape, cameraMatrix, //HAS to be implemented!
+			distortionParameters.t(), rotationVector, translationVector);
+
+		cv::Mat_<double> rotationMatrix, viewMatrix(4, 4);
+
+		// Get 3x3 rotation matrix
+		cv::Rodrigues(rotationVector, rotationMatrix);
+
+		// Zero out view matrix
+		viewMatrix = cv::Mat::zeros(4, 4, CV_64F);
+
+		// Get opencv transfer matrix (camera -> object)
+		for (int row = 0; row < 3; row++) {
+			for (int col = 0; col < 3; col++) {
+				viewMatrix.at<double>(row, col) = rotationMatrix.at<double>(row, col);
+			}
+			viewMatrix.at<double>(row, 3) = translationVector.at<double>(row, 0);
+		}
+		viewMatrix.at<double>(3, 3) = 1.0;
+
+		// Invert matrix to get position and orientation of camera relative to tag,
+		// storing it in a buffer
+		cv::Mat cameraPoseBuffer;
+		invert(viewMatrix, cameraPoseBuffer);
+
+		// Store in buffer vectors
+		inputCameraPosesBuffer.push_back(cameraPoseBuffer);
+		inputQRCodeIdentifiersBuffer.push_back(tagDataMap[qr.tag]);
+		inputQRCodeDimensionsBuffer.push_back(QRCodeSizeInMeter);
+
+		if (showResults) {
+			// Draw base image
+			cv::Mat bufferFrame = inputFrame;
+
+			vector<Point> qrShape(qr.shape.begin(), qr.shape.end());
+
+			drawContours(image, vector<vector<Point> >(1, qrShape), -1, Scalar(0,0,255), 5, 8);
+
+			imshow(QRCodeStateEstimatorWindowTitle, bufferFrame);
+			cv::waitKey(30);
+		}
+	}
+
+	
+
+	return -1;
+}
+
+float QRFinder::getQRSizefromString(String qrString) {
+
+	return 0.2;
+}
 
 //###############################################################################
 //Decodation Support Function
