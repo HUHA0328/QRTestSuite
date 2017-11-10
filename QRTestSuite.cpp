@@ -1,12 +1,14 @@
-// QRTestSuite.cpp : Defines the entry point for the console application.
-//
-
 #include "stdafx.h"
 #include "QRTestSuite.hpp"
 
 //###############################################################################
 //Methods
 //###############################################################################
+int main() {
+	return 0;
+}
+
+
 QRFinder::QRFinder(int inputCameraImageWidth,
 	int inputCameraImageHeight,
 	const cv::Mat_<double>& inputCameraCalibrationMatrix,
@@ -128,9 +130,6 @@ int QRFinder::QRBenchmark(bool showCalc)
 	VideoCapture capture;
 	capture.open("C:/Users/Frederik/Desktop/VidTests/moto/multi-short-movement.mp4");
 
-	// Creation of Intermediate 'Image' Objects required later
-	Mat empty(Size(100, 100), CV_MAKETYPE(image.depth(), 1));
-
 	if (!capture.isOpened()) {
 		cerr << " ERR: Unable find input Video source." << endl;
 		return -1;
@@ -228,7 +227,8 @@ int QRFinder::QRScan(vector<vector<FiP>> FiPList, vector<QRCode> QRList,
 
 	// We still need to calculate and return the pose here (and the Position of the QR codes <- not sure we need there or if 
 	// they are implied by the Pose Estimation)
-	
+
+	return 0;
 }
 
 /* calling a method an reinitializing a lot of Variables should create a overhead compared to just use one method?
@@ -625,7 +625,7 @@ int QRFinder::CalculatePoseFromQRList(
 
 		//Just let full QR Codes (three FIPs be eligible?) or be more valuable in some way
 
-		double QRCodeSizeInMeter = 0.20; //where are we going to encode this
+		double QRCodeSizeInMeter = getQRSizefromString("abc"); //where are we going to encode this
 		//QRCodeSizeInMeter = qr.size;
 
 		double buf = QRCodeSizeInMeter / 2.0;

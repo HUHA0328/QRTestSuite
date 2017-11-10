@@ -1,6 +1,3 @@
-#ifndef QRFINDERHPP
-#define QRFINDERHPP
-
 #include <iostream>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -15,8 +12,7 @@
 using namespace std;
 using namespace cv;
 using namespace zbar;
-static const std::string QRCodeStateEstimatorWindowTitle =
-"QR Code Finder";
+static const std::string QRCodeStateEstimatorWindowTitle = "QR Code Finder";
 //###############################################################################
 // Initialization
 //###############################################################################
@@ -28,13 +24,11 @@ class QRFinder {
 
 public:
 
-
-
 	QRFinder(int inputCameraImageWidth,
 		int inputCameraImageHeight,
 		const cv::Mat_<double>& inputCameraCalibrationMatrix,
 		const cv::Mat_<double>& inputCameraDistortionParameters,
-		bool pShowResults) {};
+		bool pShowResults);
 
 	//#################		Global Variables
 	vector<int> fips; //just saves the number of FiPs detected for Benchmark
@@ -48,7 +42,6 @@ public:
 	zbar::ImageScanner zbarScanner;
 	cv::Mat frameBuffer;
 	bool showResults; // True if the image should be shown in a window
-
 
 	//#################		Images
 	Mat image; //back to multiFIPdetector
@@ -101,5 +94,3 @@ public:
 	String decode(Mat inputImage);
 	String decodeMobile(Mat inputImage);
 };
-
-#endif
