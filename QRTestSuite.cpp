@@ -206,6 +206,23 @@ int QRFinder::QRScan(vector<vector<FiP>> FiPList, vector<QRCode> QRList,
 	std::string& inputQRCodeIdentifierBuffer,
 	double& inputQRCodeDimensionBuffer)
 {
+
+	//vector<vector<FiP>> FiPList;
+	//vector<QRCode> QRList;
+	std::vector<cv::Mat> cameraPosesBuffer;
+	std::vector<std::string> QRCodeIdentifiersBuffer;
+	std::vector<double> QRCodeDimensionBuffer;
+	std::vector<std::string> test;
+	test.clear();
+	
+	test.push_back("empty");
+
+	if (inputGrayscaleFrame.cols <= 0 || inputGrayscaleFrame.rows <= 0) {
+		cout << "testo" << endl;
+		inputQRCodeIdentifierBuffer = test[0];
+		return 0;
+	}
+
 	FiPList = cv_FiPdetection(image, FiPList); //<--- the QR list should go there
 
 											   //cout << FiPList.size() << endl;
@@ -227,6 +244,19 @@ int QRFinder::QRScan(vector<vector<FiP>> FiPList, vector<QRCode> QRList,
 
 	// We still need to calculate and return the pose here (and the Position of the QR codes <- not sure we need there or if 
 	// they are implied by the Pose Estimation)
+	CalculatePoseFromQRList(
+		inputGrayscaleFrame,
+		QRList,
+		cameraPosesBuffer,
+		QRCodeIdentifiersBuffer,
+		QRCodeDimensionBuffer);
+
+	if (cameraPosesBuffer.size() > 0) {
+		inputCameraPoseBuffer = cameraPosesBuffer[0];
+		inputQRCodeIdentifierBuffer = QRCodeIdentifiersBuffer[0];
+		inputQRCodeDimensionBuffer = QRCodeDimensionBuffer[0];
+	}
+
 
 	return 0;
 }
@@ -684,7 +714,7 @@ int QRFinder::CalculatePoseFromQRList(
 
 	
 
-	return -1;
+	return 0;
 }
 
 float QRFinder::getQRSizefromString(String qrString) {
